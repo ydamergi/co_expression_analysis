@@ -33,9 +33,22 @@ The CPM_FPKM_filter.Rmd script focuses on determining optimal CPM and FPKM filte
 
 1. Gene Count Optimization:
 Identifies CPM and FPKM filtering thresholds to ensure a consistent set of around 12,000 genes across at least 9 samples for each age and tissue category.
-
 2. Minimizing Variance:
 Aims to minimize variance between tissues within a given age category, promoting uniformity in gene expression patterns.
-
 3. Informed Filtering:
 Utilizes an educated approach to filtering, considering both the total gene count and inter-tissue variance to strike a balance between dataset size and consistency.
+
+## Co-Expression Analysis Data Preparation (co_expression_analysis_data.Rmd)
+
+The co_expression_analysis_data.Rmd script is dedicated to the preparation of data for co-expression analysis. It performs the following key tasks:
+
+1. Outlier Removal:
+Identifies and removes outlier samples based on summary statistics results, ensuring data integrity.
+2. Data Filtering:
+Filters read count data using insights from CPM and FPKM analysis, optimizing the dataset for subsequent co-expression analysis.
+3. Normalization and Transformation:
+Applies CPM normalization to the data and employs hyperbolic sine transformation on the count data, enhancing its suitability for co-expression analysis.
+4. Data Segmentation:
+Divides the processed data into subsets based on age and tissue categories, facilitating focused analyses.
+5. Writes final counts:
+Writes the pre-processed data for each subset to files, creating datasets ready for seamless integration into the subsequent co-expression analysis.
