@@ -33,7 +33,9 @@ The CPM_FPKM_filter.Rmd script focuses on determining optimal CPM and FPKM filte
 
 1.Gene Count Optimization:
 Identifies CPM and FPKM filtering thresholds to ensure a consistent set of around 12,000 genes across at least 9 samples for each age and tissue category.
+
 2.Minimizing Variance:
 Aims to minimize variance between tissues within a given age category, promoting uniformity in gene expression patterns.
+
 3.Informed Filtering:
 Utilizes an educated approach to filtering, considering both the total gene count and inter-tissue variance to strike a balance between dataset size and consistency.
