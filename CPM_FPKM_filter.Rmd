@@ -1,0 +1,1894 @@
+# Load libraries
+```{r}
+.libPaths("/usr/lib/R/site-library")
+library("edgeR", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DESeq2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DEsingle", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("biomaRt",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("goseq" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("VennDiagram", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggpubr", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("Rtsne", quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("MEGENA",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DGCA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('dplyr', quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("ggplot2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggrepel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gridExtra",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("readr" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggfortify" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("cowplot" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("tidyverse", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("WGCNA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("reshape2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("foreach", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("doParallel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("bigmemory", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gtools", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("data.table", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("flashClust", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("dendextend", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('vegan', quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ade4", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gridGraphics", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("networkD3", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(readxl, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(dplyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(tidyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(plotly, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+
+```
+
+# Run the RNA Seq R script first to be able to Load the annotation 
+```{r}
+annotation.ensembl.symbol <-read.table(file = "/home/yassine/Downloads/between_tissue/annotation.ensembl.symbol.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+
+gene.length<-read.table(file = "/home/yassine/Downloads/between_tissue/gene.length.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+
+annotation.GO.biomart<-read.table (file ="/home/yassine/Downloads/between_tissue/annotation.GO.biomart.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+```
+
+# Load count data information (meta data) 
+
+```{r}
+sample_info <- as.data.frame(read_excel("/home/yassine/Downloads/Repro_omics_sample_information_06_27_2023.xlsx"))
+```
+
+```{r}
+count_data_b <- read.table("/home/yassine/Downloads/filtered_count_data.txt",
+                    sep = "\t" ,
+                    header = TRUE)
+```
+
+```{r}
+# Assuming your data frame is named count_data_b
+# Remove columns containing either J148B or H273B in their names
+
+columns_to_remove <- grepl("J148B_hypothalamus_6|H273B_hypothalamus_9", colnames(count_data_b))
+count_data_b <- count_data_b[, !columns_to_remove]
+
+```
+
+```{r}
+read_counts_annotated <- merge(count_data_b,
+                               annotation.ensembl.symbol,
+                               by.x="gene_id",
+                               by.y="ensembl_gene_id",
+                               all.x=FALSE,
+                               all.y=FALSE)
+```
+
+```{r}
+count_data_annotated<-read_counts_annotated
+```
+
+
+```{r}
+pwbc_columns_6 <- grep("pwbc_6", colnames(count_data_b))
+pwbc_6_read_counts <- count_data_b[, c(1,pwbc_columns_6)]
+pwbc_6_read_counts_annotated <- count_data_annotated[, c(pwbc_columns_6,126:134)]
+pwbc_6_length<- pwbc_6_read_counts_annotated$transcript_length
+
+pwbc_columns_9 <- grep("pwbc_9", colnames(count_data_b))
+pwbc_9_read_counts <- count_data_b[, c(1,pwbc_columns_9)]
+
+pwbc_9_read_counts_annotated <- count_data_annotated[, c(pwbc_columns_9,126:134)]
+pwbc_9_length<- pwbc_9_read_counts_annotated$transcript_length
+
+pwbc_columns_19 <- grep("pwbc_19", colnames(count_data_b))
+pwbc_19_read_counts <- count_data_b[, c(1,pwbc_columns_19)]
+
+pwbc_19_read_counts_annotated <- count_data_annotated[, c(pwbc_columns_19,126:134)]
+pwbc_19_length<- pwbc_19_read_counts_annotated$transcript_length
+
+endometrium_columns_6 <- grep("endometrium_6", colnames(count_data_b))
+endometrium_6_read_counts <- count_data_b[, c(1,endometrium_columns_6)]
+
+endometrium_6_read_counts_annotated <- count_data_annotated[, c(endometrium_columns_6,126:134)]
+endometrium_6_length<- endometrium_6_read_counts_annotated$transcript_length
+
+endometrium_columns_9 <- grep("endometrium_9", colnames(count_data_b))
+endometrium_9_read_counts <- count_data_b[, c(1,endometrium_columns_9)]
+
+endometrium_9_read_counts_annotated <- count_data_annotated[, c(endometrium_columns_9,126:134)]
+endometrium_9_length<- endometrium_9_read_counts_annotated$transcript_length
+
+endometrium_columns_19 <- grep("endometrium_19", colnames(count_data_b))
+endometrium_19_read_counts <- count_data_b[, c(1,endometrium_columns_19)]
+
+endometrium_19_read_counts_annotated <- count_data_annotated[, c(endometrium_columns_19,126:134)]
+endometrium_19_length<- endometrium_19_read_counts_annotated$transcript_length
+
+hypothalamus_columns_6 <- grep("hypothalamus_6", colnames(count_data_b))
+hypothalamus_6_read_counts <- count_data_b[, c(1,hypothalamus_columns_6)]
+
+hypothalamus_6_read_counts_annotated <- count_data_annotated[, c(hypothalamus_columns_6,126:134)]
+hypothalamus_6_length<- hypothalamus_6_read_counts_annotated$transcript_length
+
+hypothalamus_columns_9 <- grep("hypothalamus_9", colnames(count_data_b))
+hypothalamus_9_read_counts <- count_data_b[, c(1,hypothalamus_columns_9)]
+
+hypothalamus_9_read_counts_annotated <- count_data_annotated[, c(hypothalamus_columns_9,126:134)]
+hypothalamus_9_length<- hypothalamus_9_read_counts_annotated$transcript_length
+
+hypothalamus_columns_19 <- grep("hypothalamus_19", colnames(count_data_b))
+hypothalamus_19_read_counts <- count_data_b[, c(1,hypothalamus_columns_19)]
+
+hypothalamus_19_read_counts_annotated <- count_data_annotated[, c(hypothalamus_columns_19,126:134)]
+hypothalamus_19_length<- hypothalamus_19_read_counts_annotated$transcript_length
+
+pituitary_columns_6 <- grep("pituitary_6", colnames(count_data_b))
+pituitary_6_read_counts <- count_data_b[, c(1,pituitary_columns_6)]
+
+pituitary_6_read_counts_annotated <- count_data_annotated[, c(pituitary_columns_6,126:134)]
+pituitary_6_length<- pituitary_6_read_counts_annotated$transcript_length
+
+pituitary_columns_9 <- grep("pituitary_9", colnames(count_data_b))
+pituitary_9_read_counts <- count_data_b[, c(1,pituitary_columns_9)]
+
+pituitary_9_read_counts_annotated <- count_data_annotated[, c(pituitary_columns_9,126:134)]
+pituitary_9_length<- pituitary_9_read_counts_annotated$transcript_length
+
+pituitary_columns_19 <- grep("pituitary_19", colnames(count_data_b))
+pituitary_19_read_counts <- count_data_b[, c(1,pituitary_columns_19)]
+
+pituitary_19_read_counts_annotated <- count_data_annotated[, c(pituitary_columns_19,126:134)]
+pituitary_19_length<- pituitary_19_read_counts_annotated$transcript_length
+```
+
+```{r}
+# Number of CPU cores to use
+num_cores <- 4
+# Register parallel cluster
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+```
+
+
+```{r}
+x <- pwbc_6_read_counts[, -1] / pwbc_6_length
+pwbc_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_6_fpkm<-as.data.frame(edgeR::rpkm(pwbc_6_read_counts[, -1], pwbc_6_length))
+pwbc_6_cpm<-as.data.frame(edgeR::cpm(pwbc_6_read_counts[, -1]))
+```
+
+```{r}
+x <-  pwbc_9_read_counts[, -1] / pwbc_9_length
+pwbc_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_9_fpkm<-as.data.frame(edgeR::rpkm(pwbc_9_read_counts[, -1], pwbc_9_length))
+pwbc_9_cpm<-as.data.frame(edgeR::cpm(pwbc_9_read_counts[, -1]))
+```
+
+
+```{r}
+x <-  pwbc_19_read_counts[, -1] / pwbc_19_length
+pwbc_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_19_fpkm<-as.data.frame(edgeR::rpkm(pwbc_19_read_counts[, -1], pwbc_19_length))
+pwbc_19_cpm<-as.data.frame(edgeR::cpm(pwbc_19_read_counts[, -1]))
+```
+
+
+```{r}
+rownames(pwbc_6_fpkm)<-pwbc_6_read_counts$gene_id
+rownames(pwbc_6_cpm)<-pwbc_6_read_counts$gene_id
+
+rownames(pwbc_9_fpkm)<-pwbc_9_read_counts$gene_id
+rownames(pwbc_9_cpm)<-pwbc_9_read_counts$gene_id
+
+rownames(pwbc_19_fpkm)<-pwbc_19_read_counts$gene_id
+rownames(pwbc_19_cpm)<-pwbc_19_read_counts$gene_id
+
+```
+
+
+```{r}
+cpm_sequence <- seq(0, 4, by = 0.5)
+fpkm_sequence <- seq(0, 2, by = 0.1)
+
+```
+
+```{r}
+# Assuming pwbc_6_df is initialized as an empty data frame
+pwbc_6_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pwbc_6_fpkm))) {
+      for (i in seq_along(rownames(pwbc_6_fpkm))) {
+        if (pwbc_6_fpkm[i, j] > fpkm & pwbc_6_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pwbc_6_fpkm)[j], cpm, fpkm, gene_count)
+      pwbc_6_df <- rbind(pwbc_6_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pwbc_6_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pwbc_6_df$CPM <- as.numeric(pwbc_6_df$CPM)
+pwbc_6_df$FPKM <- as.numeric(pwbc_6_df$FPKM)
+pwbc_6_df$num_genes <- as.numeric(pwbc_6_df$num_genes )
+
+print(pwbc_6_df)
+
+```
+
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pwbc_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pwbc_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pwbc_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pwbc_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+```
+
+```{r}
+desired_pairs <- data.frame(
+  FPKM = c(0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4,1.6,1.8),
+  CPM = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4,4.5)
+)
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor PWBC Tissue of Heifer at 6 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pwbc_6_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming pwbc_9_df is initialized as an empty data frame
+pwbc_9_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pwbc_9_fpkm))) {
+      for (i in seq_along(rownames(pwbc_9_fpkm))) {
+        if (pwbc_9_fpkm[i, j] > fpkm & pwbc_9_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pwbc_9_fpkm)[j], cpm, fpkm, gene_count)
+      pwbc_9_df <- rbind(pwbc_9_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pwbc_9_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pwbc_9_df$CPM <- as.numeric(pwbc_9_df$CPM)
+pwbc_9_df$FPKM <- as.numeric(pwbc_9_df$FPKM)
+pwbc_9_df$num_genes <- as.numeric(pwbc_9_df$num_genes )
+
+print(pwbc_9_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pwbc_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pwbc_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pwbc_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pwbc_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+```
+
+
+```{r}
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor PWBC Tissue of Heifer at 9 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pwbc_9_cpm_fpkm_plot.html")
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming pwbc_19_df is initialized as an empty data frame
+pwbc_19_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pwbc_19_fpkm))) {
+      for (i in seq_along(rownames(pwbc_19_fpkm))) {
+        if (pwbc_19_fpkm[i, j] > fpkm & pwbc_19_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pwbc_19_fpkm)[j], cpm, fpkm, gene_count)
+      pwbc_19_df <- rbind(pwbc_19_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pwbc_19_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pwbc_19_df$CPM <- as.numeric(pwbc_19_df$CPM)
+pwbc_19_df$FPKM <- as.numeric(pwbc_19_df$FPKM)
+pwbc_19_df$num_genes <- as.numeric(pwbc_19_df$num_genes )
+
+print(pwbc_19_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pwbc_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pwbc_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pwbc_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pwbc_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor PWBC Tissue of Heifer at 19 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pwbc_19_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+
+```{r}
+x <- endometrium_6_read_counts[, -1] / endometrium_6_length
+endometrium_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_6_fpkm<-as.data.frame(edgeR::rpkm(endometrium_6_read_counts[, -1], endometrium_6_length))
+endometrium_6_cpm<-as.data.frame(edgeR::cpm(endometrium_6_read_counts[, -1]))
+```
+
+```{r}
+x <-  endometrium_9_read_counts[, -1] / endometrium_9_length
+endometrium_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_9_fpkm<-as.data.frame(edgeR::rpkm(endometrium_9_read_counts[, -1], endometrium_9_length))
+endometrium_9_cpm<-as.data.frame(edgeR::cpm(endometrium_9_read_counts[, -1]))
+```
+
+
+```{r}
+x <-  endometrium_19_read_counts[, -1] / endometrium_19_length
+endometrium_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_19_fpkm<-as.data.frame(edgeR::rpkm(endometrium_19_read_counts[, -1], endometrium_19_length))
+endometrium_19_cpm<-as.data.frame(edgeR::cpm(endometrium_19_read_counts[, -1]))
+```
+
+
+```{r}
+rownames(endometrium_6_fpkm)<-endometrium_6_read_counts$gene_id
+rownames(endometrium_6_cpm)<-endometrium_6_read_counts$gene_id
+
+rownames(endometrium_9_fpkm)<-endometrium_9_read_counts$gene_id
+rownames(endometrium_9_cpm)<-endometrium_9_read_counts$gene_id
+
+rownames(endometrium_19_fpkm)<-endometrium_19_read_counts$gene_id
+rownames(endometrium_19_cpm)<-endometrium_19_read_counts$gene_id
+
+```
+
+```{r}
+count_genes_below_cpm <- function(threshold) {
+  count <- sum(apply(endometrium_6_cpm[,-1], 1, function(row) any(row > threshold, na.rm = TRUE)))
+  return(count)
+}
+
+counts_per_cpm <- sapply(cpm_sequence, count_genes_below_cpm)
+result_cpm <- data.frame(cpm = cpm_sequence, number_of_genes  = counts_per_cpm)
+```
+
+```{r}
+# Assuming endometrium_6_df is initialized as an empty data frame
+endometrium_6_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(endometrium_6_fpkm))) {
+      for (i in seq_along(rownames(endometrium_6_fpkm))) {
+        if (endometrium_6_fpkm[i, j] > fpkm & endometrium_6_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(endometrium_6_fpkm)[j], cpm, fpkm, gene_count)
+      endometrium_6_df <- rbind(endometrium_6_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(endometrium_6_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+endometrium_6_df$CPM <- as.numeric(endometrium_6_df$CPM)
+endometrium_6_df$FPKM <- as.numeric(endometrium_6_df$FPKM)
+endometrium_6_df$num_genes <- as.numeric(endometrium_6_df$num_genes )
+
+print(endometrium_6_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- endometrium_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- endometrium_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- endometrium_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- endometrium_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor endometrium Tissue of Heifer at 6 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/endometrium_6_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming endometrium_9_df is initialized as an empty data frame
+endometrium_9_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(endometrium_9_fpkm))) {
+      for (i in seq_along(rownames(endometrium_9_fpkm))) {
+        if (endometrium_9_fpkm[i, j] > fpkm & endometrium_9_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(endometrium_9_fpkm)[j], cpm, fpkm, gene_count)
+      endometrium_9_df <- rbind(endometrium_9_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(endometrium_9_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+endometrium_9_df$CPM <- as.numeric(endometrium_9_df$CPM)
+endometrium_9_df$FPKM <- as.numeric(endometrium_9_df$FPKM)
+endometrium_9_df$num_genes <- as.numeric(endometrium_9_df$num_genes )
+
+print(endometrium_9_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- endometrium_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- endometrium_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- endometrium_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- endometrium_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor endometrium Tissue of Heifer at 9 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/endometrium_9_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+```{r}
+# Assuming endometrium_19_df is initialized as an empty data frame
+endometrium_19_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(endometrium_19_fpkm))) {
+      for (i in seq_along(rownames(endometrium_19_fpkm))) {
+        if (endometrium_19_fpkm[i, j] > fpkm & endometrium_19_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(endometrium_19_fpkm)[j], cpm, fpkm, gene_count)
+      endometrium_19_df <- rbind(endometrium_19_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(endometrium_19_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+endometrium_19_df$CPM <- as.numeric(endometrium_19_df$CPM)
+endometrium_19_df$FPKM <- as.numeric(endometrium_19_df$FPKM)
+endometrium_19_df$num_genes <- as.numeric(endometrium_19_df$num_genes )
+
+print(endometrium_19_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- endometrium_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- endometrium_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- endometrium_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- endometrium_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor endometrium Tissue of Heifer at 19 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/endometrium_19_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+
+```{r}
+x <- hypothalamus_6_read_counts[, -1] / hypothalamus_6_length
+hypothalamus_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_6_fpkm<-as.data.frame(edgeR::rpkm(hypothalamus_6_read_counts[, -1], hypothalamus_6_length))
+hypothalamus_6_cpm<-as.data.frame(edgeR::cpm(hypothalamus_6_read_counts[, -1]))
+```
+
+```{r}
+x <-  hypothalamus_9_read_counts[, -1] / hypothalamus_9_length
+hypothalamus_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_9_fpkm<-as.data.frame(edgeR::rpkm(hypothalamus_9_read_counts[, -1], hypothalamus_9_length))
+hypothalamus_9_cpm<-as.data.frame(edgeR::cpm(hypothalamus_9_read_counts[, -1]))
+```
+
+
+```{r}
+x <-  hypothalamus_19_read_counts[, -1] / hypothalamus_19_length
+hypothalamus_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_19_fpkm<-as.data.frame(edgeR::rpkm(hypothalamus_19_read_counts[, -1], hypothalamus_19_length))
+hypothalamus_19_cpm<-as.data.frame(edgeR::cpm(hypothalamus_19_read_counts[, -1]))
+```
+
+
+```{r}
+rownames(hypothalamus_6_fpkm)<-hypothalamus_6_read_counts$gene_id
+rownames(hypothalamus_6_cpm)<-hypothalamus_6_read_counts$gene_id
+
+rownames(hypothalamus_9_fpkm)<-hypothalamus_9_read_counts$gene_id
+rownames(hypothalamus_9_cpm)<-hypothalamus_9_read_counts$gene_id
+
+rownames(hypothalamus_19_fpkm)<-hypothalamus_19_read_counts$gene_id
+rownames(hypothalamus_19_cpm)<-hypothalamus_19_read_counts$gene_id
+
+```
+
+
+```{r}
+count_genes_below_cpm <- function(threshold) {
+  count <- sum(apply(hypothalamus_6_cpm[,-1], 1, function(row) any(row > threshold, na.rm = TRUE)))
+  return(count)
+}
+
+counts_per_cpm <- sapply(cpm_sequence, count_genes_below_cpm)
+result_cpm <- data.frame(cpm = cpm_sequence, number_of_genes  = counts_per_cpm)
+```
+
+```{r}
+# Assuming hypothalamus_6_df is initialized as an empty data frame
+hypothalamus_6_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(hypothalamus_6_fpkm))) {
+      for (i in seq_along(rownames(hypothalamus_6_fpkm))) {
+        if (hypothalamus_6_fpkm[i, j] > fpkm & hypothalamus_6_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(hypothalamus_6_fpkm)[j], cpm, fpkm, gene_count)
+      hypothalamus_6_df <- rbind(hypothalamus_6_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(hypothalamus_6_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+hypothalamus_6_df$CPM <- as.numeric(hypothalamus_6_df$CPM)
+hypothalamus_6_df$FPKM <- as.numeric(hypothalamus_6_df$FPKM)
+hypothalamus_6_df$num_genes <- as.numeric(hypothalamus_6_df$num_genes )
+
+print(hypothalamus_6_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- hypothalamus_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- hypothalamus_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- hypothalamus_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- hypothalamus_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor hypothalamus Tissue of Heifer at 6 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/hypothalamus_6_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming hypothalamus_9_df is initialized as an empty data frame
+hypothalamus_9_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(hypothalamus_9_fpkm))) {
+      for (i in seq_along(rownames(hypothalamus_9_fpkm))) {
+        if (hypothalamus_9_fpkm[i, j] > fpkm & hypothalamus_9_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(hypothalamus_9_fpkm)[j], cpm, fpkm, gene_count)
+      hypothalamus_9_df <- rbind(hypothalamus_9_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(hypothalamus_9_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+hypothalamus_9_df$CPM <- as.numeric(hypothalamus_9_df$CPM)
+hypothalamus_9_df$FPKM <- as.numeric(hypothalamus_9_df$FPKM)
+hypothalamus_9_df$num_genes <- as.numeric(hypothalamus_9_df$num_genes )
+
+print(hypothalamus_9_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- hypothalamus_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- hypothalamus_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- hypothalamus_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- hypothalamus_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor hypothalamus Tissue of Heifer at 9 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/hypothalamus_9_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming hypothalamus_19_df is initialized as an empty data frame
+hypothalamus_19_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(hypothalamus_19_fpkm))) {
+      for (i in seq_along(rownames(hypothalamus_19_fpkm))) {
+        if (hypothalamus_19_fpkm[i, j] > fpkm & hypothalamus_19_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(hypothalamus_19_fpkm)[j], cpm, fpkm, gene_count)
+      hypothalamus_19_df <- rbind(hypothalamus_19_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(hypothalamus_19_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+hypothalamus_19_df$CPM <- as.numeric(hypothalamus_19_df$CPM)
+hypothalamus_19_df$FPKM <- as.numeric(hypothalamus_19_df$FPKM)
+hypothalamus_19_df$num_genes <- as.numeric(hypothalamus_19_df$num_genes )
+
+print(hypothalamus_19_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- hypothalamus_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- hypothalamus_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- hypothalamus_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- hypothalamus_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+```
+
+
+```{r}
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor hypothalamus Tissue of Heifer at 19 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/hypothalamus_19_cpm_fpkm_plot.html")
+
+```
+```{r}
+plot
+```
+
+
+```{r}
+x <- pituitary_6_read_counts[, -1] / pituitary_6_length
+pituitary_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_6_fpkm<-as.data.frame(edgeR::rpkm(pituitary_6_read_counts[, -1], pituitary_6_length))
+pituitary_6_cpm<-as.data.frame(edgeR::cpm(pituitary_6_read_counts[, -1]))
+```
+
+```{r}
+x <-  pituitary_9_read_counts[, -1] / pituitary_9_length
+pituitary_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_9_fpkm<-as.data.frame(edgeR::rpkm(pituitary_9_read_counts[, -1], pituitary_9_length))
+pituitary_9_cpm<-as.data.frame(edgeR::cpm(pituitary_9_read_counts[, -1]))
+```
+
+
+```{r}
+x <-  pituitary_19_read_counts[, -1] / pituitary_19_length
+pituitary_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_19_fpkm<-as.data.frame(edgeR::rpkm(pituitary_19_read_counts[, -1], pituitary_19_length))
+pituitary_19_cpm<-as.data.frame(edgeR::cpm(pituitary_19_read_counts[, -1]))
+```
+
+
+```{r}
+rownames(pituitary_6_fpkm)<-pituitary_6_read_counts$gene_id
+rownames(pituitary_6_cpm)<-pituitary_6_read_counts$gene_id
+
+rownames(pituitary_9_fpkm)<-pituitary_9_read_counts$gene_id
+rownames(pituitary_9_cpm)<-pituitary_9_read_counts$gene_id
+
+rownames(pituitary_19_fpkm)<-pituitary_19_read_counts$gene_id
+rownames(pituitary_19_cpm)<-pituitary_19_read_counts$gene_id
+
+```
+
+
+```{r}
+count_genes_below_cpm <- function(threshold) {
+  count <- sum(apply(pituitary_6_cpm[,-1], 1, function(row) any(row > threshold, na.rm = TRUE)))
+  return(count)
+}
+
+counts_per_cpm <- sapply(cpm_sequence, count_genes_below_cpm)
+result_cpm <- data.frame(cpm = cpm_sequence, number_of_genes  = counts_per_cpm)
+```
+
+```{r}
+# Assuming pituitary_6_df is initialized as an empty data frame
+pituitary_6_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pituitary_6_fpkm))) {
+      for (i in seq_along(rownames(pituitary_6_fpkm))) {
+        if (pituitary_6_fpkm[i, j] > fpkm & pituitary_6_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pituitary_6_fpkm)[j], cpm, fpkm, gene_count)
+      pituitary_6_df <- rbind(pituitary_6_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pituitary_6_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pituitary_6_df$CPM <- as.numeric(pituitary_6_df$CPM)
+pituitary_6_df$FPKM <- as.numeric(pituitary_6_df$FPKM)
+pituitary_6_df$num_genes <- as.numeric(pituitary_6_df$num_genes )
+
+print(pituitary_6_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pituitary_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pituitary_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pituitary_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pituitary_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+```
+
+
+```{r}
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+```
+
+```{r}
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor pituitary Tissue of Heifer at 6 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pituitary_6_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+
+```{r}
+# Assuming pituitary_9_df is initialized as an empty data frame
+pituitary_9_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pituitary_9_fpkm))) {
+      for (i in seq_along(rownames(pituitary_9_fpkm))) {
+        if (pituitary_9_fpkm[i, j] > fpkm & pituitary_9_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pituitary_9_fpkm)[j], cpm, fpkm, gene_count)
+      pituitary_9_df <- rbind(pituitary_9_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pituitary_9_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pituitary_9_df$CPM <- as.numeric(pituitary_9_df$CPM)
+pituitary_9_df$FPKM <- as.numeric(pituitary_9_df$FPKM)
+pituitary_9_df$num_genes <- as.numeric(pituitary_9_df$num_genes )
+
+print(pituitary_9_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pituitary_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pituitary_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pituitary_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pituitary_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+```
+
+
+```{r}
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+```
+
+```{r}
+
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor pituitary Tissue of Heifer at 9 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pituitary_9_cpm_fpkm_plot.html")
+
+```
+
+```{r}
+plot
+```
+
+```{r}
+# Assuming pituitary_19_df is initialized as an empty data frame
+pituitary_19_df <- data.frame(samples = character(), CPM = numeric(), FPKM = numeric(), num_genes = integer())
+
+# Assuming cpm_sequence and fpkm_sequence are defined
+
+for (cpm in cpm_sequence) {
+  for (fpkm in fpkm_sequence) {
+    gene_count <- 0
+    
+    for (j in seq_along(colnames(pituitary_19_fpkm))) {
+      for (i in seq_along(rownames(pituitary_19_fpkm))) {
+        if (pituitary_19_fpkm[i, j] > fpkm & pituitary_19_cpm[i, j] > cpm) {
+          gene_count <- gene_count + 1
+        }
+      }
+      
+      new_entry <- c(colnames(pituitary_19_fpkm)[j], cpm, fpkm, gene_count)
+      pituitary_19_df <- rbind(pituitary_19_df, new_entry)
+      gene_count <- 0
+    }
+  }
+}
+
+```
+
+
+```{r}
+colnames(pituitary_19_df)<-c("samples", "CPM" , "FPKM" , "num_genes")
+pituitary_19_df$CPM <- as.numeric(pituitary_19_df$CPM)
+pituitary_19_df$FPKM <- as.numeric(pituitary_19_df$FPKM)
+pituitary_19_df$num_genes <- as.numeric(pituitary_19_df$num_genes )
+
+print(pituitary_19_df)
+
+```
+
+```{r}
+# Create a data frame with unique (CPM, FPKM) pairs and their corresponding threshold values
+threshold_7 <- pituitary_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_7 = min(num_genes[order(num_genes, decreasing = TRUE)][7]))
+
+threshold_8 <- pituitary_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_8 = min(num_genes[order(num_genes, decreasing = TRUE)][8]))
+
+threshold_9 <- pituitary_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_9 = min(num_genes[order(num_genes, decreasing = TRUE)][9]))
+
+threshold_10 <- pituitary_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarize(num_genes_10 = min(num_genes[order(num_genes, decreasing = TRUE)][10]))
+
+```
+
+
+```{r}
+merged_df <- threshold_7
+merged_df <- left_join(merged_df, threshold_8, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_9, by = c("CPM", "FPKM"))
+merged_df <- left_join(merged_df, threshold_10, by = c("CPM", "FPKM"))
+print(merged_df)
+```
+
+```{r}
+gathered_df <- merged_df %>%
+  gather(key = "num_samples", value = "num_genes", num_genes_7:num_genes_10) %>%
+  mutate(num_samples = as.numeric(sub("num_genes_", "", num_samples)))
+```
+
+```{r}
+selected_rows <- gathered_df %>%
+  filter(CPM %in% desired_pairs$CPM & FPKM %in% desired_pairs$FPKM)
+```
+
+```{r}
+plot <- ggplot(selected_rows, aes(x = FPKM, y = CPM, shape = factor(num_samples), fill = num_genes)) +
+  geom_jitter(width = 0.05, height = 0.05, size = 3) +  
+  scale_fill_gradient(low = "#DDDDDD", high = "#333333") +  # Adjust the low and high values as needed
+  scale_shape_manual(values = c(21:25)) +
+  labs(x = "FPKM", y = "CPM", color = "num_genes", shape = "num_samples") +
+  scale_x_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1,1.2, 1.4,1.6,1.8)) +
+  scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2, 2.5,3,3.5,4)) +
+  ggtitle("Relationship Between Gene Expression Levels (FPKM and CPM), Gene Count, and Sample Multiplicity\nfor pituitary Tissue of Heifer at 19 Months of Age at Slaughtering Time")
+plot <-ggplotly(plot)
+htmlwidgets::saveWidget(plot, file ="/home/yassine/Downloads/between_tissue/Figures/pituitary_19_cpm_fpkm_plot.html")
+
+```
+
+
+```{r}
+plot
+```
+
+
+
+
+
+```{r}
+stat_pwbc_6 <- pwbc_6_df %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pwbc_6 <- stat_pwbc_6[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pwbc_6)
+
+mean_num_gene_pwbc_6 <- pwbc_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_pwbc_6
+```
+
+```{r}
+stat_endo_6 <- endometrium_6_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_endo_6 <- stat_endo_6[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_endo_6)
+
+mean_num_gene_endo_6 <- endometrium_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_endo_6
+```
+
+
+```{r}
+stat_hypo_6 <- hypothalamus_6_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_hypo_6 <- stat_hypo_6[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_hypo_6)
+
+mean_num_gene_hypo_6 <- hypothalamus_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_hypo_6
+```
+
+
+```{r}
+stat_pituitary_6 <- pituitary_6_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pituitary_6 <- stat_pituitary_6[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pituitary_6)
+
+mean_num_gene_pituitary_6 <- pituitary_6_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+
+```{r}
+mean_num_gene_pituitary_6
+```
+
+```{r}
+mean_num_gene_6 <- mean_num_gene_pituitary_6 %>%
+  left_join(mean_num_gene_hypo_6, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_endo_6, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_pwbc_6, by = c("CPM", "FPKM"))
+
+colnames(mean_num_gene_6) <- c ("CPM", "FPKM","pituitary_mean_num_genes", "hypo_mean_num_genes","endo_mean_num_genes","pwbc_mean_num_genes")
+```
+
+```{r}
+mean_num_gene_6
+```
+
+```{r}
+# Filter away rows where one of the mean values is lower than 12000
+
+mean_num_gene_6 <-mean_num_gene_6 %>%
+  drop_na() %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  filter(pituitary_mean_num_genes >= 12000,
+         hypo_mean_num_genes >= 12000,
+         endo_mean_num_genes >= 12000,
+         pwbc_mean_num_genes >= 12000)
+```
+
+```{r}
+mean_num_gene_6
+```
+
+```{r}
+# Compute variance among mean_num_gene columns for each (CPM, FPKM) pair
+variance_data <- mean_num_gene_6 %>%
+  group_by(CPM, FPKM) %>%
+  summarise(variance = var(c(pituitary_mean_num_genes, hypo_mean_num_genes, endo_mean_num_genes, pwbc_mean_num_genes)))
+```
+```{r}
+# Find (CPM, FPKM) pair with the lowest variance
+min_variance_pair <- variance_data[which.min(variance_data$variance), c("CPM", "FPKM")]
+
+# Print the results
+print(min_variance_pair)
+```
+
+
+
+```{r}
+stat_pwbc_9 <- pwbc_9_df %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pwbc_9 <- stat_pwbc_9[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pwbc_9)
+
+mean_num_gene_pwbc_9 <- pwbc_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_pwbc_9
+```
+
+```{r}
+stat_endo_9 <- endometrium_9_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_endo_9 <- stat_endo_9[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_endo_9)
+
+mean_num_gene_endo_9 <- endometrium_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_endo_9
+```
+
+
+```{r}
+stat_hypo_9 <- hypothalamus_9_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_hypo_9 <- stat_hypo_9[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_hypo_9)
+
+mean_num_gene_hypo_9 <- hypothalamus_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_hypo_9
+```
+
+
+```{r}
+stat_pituitary_9 <- pituitary_9_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pituitary_9 <- stat_pituitary_9[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pituitary_9)
+
+mean_num_gene_pituitary_9 <- pituitary_9_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+
+```{r}
+mean_num_gene_pituitary_9
+```
+
+```{r}
+mean_num_gene_9 <- mean_num_gene_pituitary_9 %>%
+  left_join(mean_num_gene_hypo_9, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_endo_9, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_pwbc_9, by = c("CPM", "FPKM"))
+
+colnames(mean_num_gene_9) <- c ("CPM", "FPKM","pituitary_mean_num_genes", "hypo_mean_num_genes","endo_mean_num_genes","pwbc_mean_num_genes")
+```
+
+```{r}
+mean_num_gene_9
+```
+
+```{r}
+# Filter away rows where one of the mean values is lower than 12000
+
+mean_num_gene_9 <-mean_num_gene_9 %>%
+  drop_na() %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  filter(pituitary_mean_num_genes >= 12000,
+         hypo_mean_num_genes >= 12000,
+         endo_mean_num_genes >= 12000,
+         pwbc_mean_num_genes >= 12000)
+```
+
+```{r}
+mean_num_gene_9
+```
+
+```{r}
+# Compute variance among mean_num_gene columns for each (CPM, FPKM) pair
+variance_data <- mean_num_gene_9 %>%
+  group_by(CPM, FPKM) %>%
+  summarise(variance = var(c(pituitary_mean_num_genes, hypo_mean_num_genes, endo_mean_num_genes, pwbc_mean_num_genes)))
+```
+```{r}
+# Find (CPM, FPKM) pair with the lowest variance
+min_variance_pair <- variance_data[which.min(variance_data$variance), c("CPM", "FPKM")]
+
+# Print the results
+print(min_variance_pair)
+```
+
+
+```{r}
+stat_pwbc_19 <- pwbc_19_df %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pwbc_19 <- stat_pwbc_19[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pwbc_19)
+
+mean_num_gene_pwbc_19 <- pwbc_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_pwbc_19
+```
+
+```{r}
+stat_endo_19 <- endometrium_19_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_endo_19 <- stat_endo_19[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_endo_19)
+
+mean_num_gene_endo_19 <- endometrium_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_endo_19
+```
+
+
+```{r}
+stat_hypo_19 <- hypothalamus_19_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_hypo_19 <- stat_hypo_19[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_hypo_19)
+
+mean_num_gene_hypo_19 <- hypothalamus_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+```{r}
+mean_num_gene_hypo_19
+```
+
+
+```{r}
+stat_pituitary_19 <- pituitary_19_df %>%
+  filter(CPM != 0 & FPKM != 0) %>%
+  group_by(FPKM, CPM) %>%
+  summarise(variance_num_genes = var(num_genes),
+            mean_num_genes = mean(num_genes))%>%
+  filter(mean_num_genes > 12000)%>%
+  arrange(variance_num_genes)
+
+# Select the CPM,FPKM value for which the mean_num_genes > 12000 , than among these select the one with lowest variance in num_genes
+
+lowest_variance_pair_pituitary_19 <- stat_pituitary_19[1, c("CPM", "FPKM")]
+print(lowest_variance_pair_pituitary_19)
+
+mean_num_gene_pituitary_19 <- pituitary_19_df %>%
+  group_by(CPM, FPKM) %>%
+  summarise(mean_num_genes = mean(num_genes))
+```
+
+
+```{r}
+mean_num_gene_pituitary_19
+```
+
+```{r}
+mean_num_gene_19 <- mean_num_gene_pituitary_19 %>%
+  left_join(mean_num_gene_hypo_19, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_endo_19, by = c("CPM", "FPKM")) %>%
+  left_join(mean_num_gene_pwbc_19, by = c("CPM", "FPKM"))
+
+colnames(mean_num_gene_19) <- c ("CPM", "FPKM","pituitary_mean_num_genes", "hypo_mean_num_genes","endo_mean_num_genes","pwbc_mean_num_genes")
+```
+
+```{r}
+mean_num_gene_19
+```
+
+```{r}
+# Filter away rows where one of the mean values is lower than 12000
+
+mean_num_gene_19 <-mean_num_gene_19 %>%
+  drop_na() %>%
+  filter(CPM != 0 & FPKM != 0) %>% 
+  filter(pituitary_mean_num_genes >= 12000,
+         hypo_mean_num_genes >= 12000,
+         endo_mean_num_genes >= 12000,
+         pwbc_mean_num_genes >= 12000)
+```
+
+```{r}
+mean_num_gene_19
+```
+
+```{r}
+# Compute variance among mean_num_gene columns for each (CPM, FPKM) pair
+variance_data <- mean_num_gene_6 %>%
+  group_by(CPM, FPKM) %>%
+  summarise(variance = var(c(pituitary_mean_num_genes, hypo_mean_num_genes, endo_mean_num_genes, pwbc_mean_num_genes)))
+```
+```{r}
+# Find (CPM, FPKM) pair with the lowest variance
+min_variance_pair <- variance_data[which.min(variance_data$variance), c("CPM", "FPKM")]
+
+# Print the results
+print(min_variance_pair)
+```
