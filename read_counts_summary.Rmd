@@ -1,0 +1,368 @@
+```{r}
+library('dplyr', quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library('ggplot2', quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library('edgeR',quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("cowplot", quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("GGally",quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("DESeq2",quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library('readxl',quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("VennDiagram", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ComplexHeatmap",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("flashClust", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('plotly' , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('tidyverse' ,quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library('htmlwidgets' , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('reshape2' ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggpubr" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("car" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library") 
+library("goseq" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("stringr",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("data.table",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("tidyr",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("dplyr",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("ggsignif",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("kableExtra",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("grid",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("gridExtra",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("bigmemory",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("doParallel",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("ggmanh",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("lme4",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("emmeans",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("limma",quietly = TRUE , lib.loc="/usr/lib/R/site-library") 
+library("MultiAssayExperiment",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library('MOFA2', lib.loc="/usr/lib/R/site-library")
+```
+
+```{r}
+library("RColorBrewer",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("writexl",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+
+```
+
+
+```{r}
+files_<-list.files("/mnt/storage/lab_folder/repro_omics/alignment/",
+                  recursive=T,
+                  pattern="summary.txt",
+                  full.names = TRUE)
+```
+
+```{r}
+reads_produced_a<-data.frame()
+reads_produced_b<-data.frame()
+```
+
+```{r}
+for (n in 1:132) {
+reads_produced<-read.delim(files_[n],
+                           sep= " ",
+                           header=FALSE,
+                           stringsAsFactors = FALSE,
+                           comment.char= "#")
+sample<-substring(files[n], 54,56)
+number_of_reads_produced<-as.integer(reads_produced[1,1])
+
+reads_produced_a<-data.frame(sample,number_of_reads_produced)
+reads_produced_b<-rbind(reads_produced_b,reads_produced_a)
+}
+```
+
+
+```{r}
+files<-list.files("/mnt/storage/lab_folder/repro_omics/counting/",
+                  recursive=T,
+                  pattern="count.summary",
+                  full.names = TRUE)
+```
+
+
+
+```{r}
+counting_summary_a<-data.frame()
+counting_summary_b<-data.frame()
+
+for (n in 1:132) {
+counting_summary<-read.delim(files[n],
+                             sep= "\t",
+                             header=FALSE,
+                             stringsAsFactors = FALSE,
+                             comment.char= "#")
+sample<-substring(files[n], 54,56)
+
+number_of_reads_assigned<-as.integer(counting_summary[2,2])
+unassigned_NoFeatures<-as.integer(counting_summary[13,2])
+unassigned_Ambiguity<-as.integer(counting_summary[15,2])
+
+counting_summary_a<-data.frame(sample,
+                               number_of_reads_assigned, 
+                               unassigned_NoFeatures, 
+                               unassigned_Ambiguity)
+
+counting_summary_b<-rbind(counting_summary_b,
+                          counting_summary_a)
+}
+```
+
+
+
+```{r}
+
+counting_summary_b$reads_sequenced <-reads_produced_b$number_of_reads_produced
+
+counting_summary_b$reads_retained <- counting_summary_b$number_of_reads_assigned + counting_summary_b$unassigned_NoFeatures + counting_summary_b$unassigned_Ambiguity
+
+counting_summary_b$reads_discarted<-counting_summary_b$reads_sequenced - counting_summary_b$reads_retained
+
+counting_summary_b$perc_number_of_reads_discarted<-counting_summary_b$reads_discarted/counting_summary_b$reads_sequenced
+
+counting_summary_b$perc_number_of_reads_retained<-counting_summary_b$reads_retained/counting_summary_b$reads_sequenced
+
+counting_summary_b$perc_number_of_reads_assigned<-counting_summary_b$number_of_reads_assigned/counting_summary_b$reads_sequenced
+
+counting_summary_b$perc_unassigned_NoFeatures<-counting_summary_b$unassigned_NoFeatures/counting_summary_b$reads_sequenced
+
+counting_summary_b$perc_unassigned_Ambiguity<-counting_summary_b$unassigned_Ambiguity/counting_summary_b$reads_sequenced
+```
+
+
+```{r}
+# Filter the counting_summary_b data frame to only include samples with less than 1e+6 sequenced reads
+thresh <-1e+6
+
+samples_with_low_reads <- counting_summary_b[counting_summary_b$reads_sequenced < thresh,]
+# Get the sample names
+sample_names <- samples_with_low_reads$sample
+
+# Print the sample names
+print(sample_names)
+
+```
+
+```{r}
+samples_with_low_reads
+```
+
+```{r}
+# Filter the counting_summary_b data frame to only include samples with more than 1e+7 produced reads
+samples_with_high_reads <- counting_summary_b[counting_summary_b$reads_sequenced > 1e+6,]
+
+```
+
+
+# Summary statistics
+```{r}
+
+# Get the percentages and absolut counts of Unassigned_Ambiguity, Unassigned_NoFeatures, and Assigned reads for samples that have a number of assigned reads larger that 1e+7
+
+percentages_of_unassigned_ambiguity <- samples_with_high_reads$perc_unassigned_Ambiguity
+percentages_of_unassigned_no_features <- samples_with_high_reads$perc_unassigned_NoFeatures
+percentages_of_assigned_reads <- samples_with_high_reads$perc_number_of_reads_assigned
+
+number_unassigned_ambiguity <- samples_with_high_reads$unassigned_Ambiguity
+number_of_unassigned_no_features <- samples_with_high_reads$unassigned_NoFeatures
+number_of_assigned_reads <- samples_with_high_reads$number_of_reads_assigned
+
+# Calculate the mean and variance across samples of the percentages
+
+mean_percentages_of_unassigned_ambiguity <- mean(percentages_of_unassigned_ambiguity)
+mean_percentages_of_unassigned_no_features <- mean(percentages_of_unassigned_no_features)
+mean_percentages_of_assigned_reads <- mean(percentages_of_assigned_reads)
+
+mean_number_of_unassigned_ambiguity <- mean(number_unassigned_ambiguity)
+mean_number_of_unassigned_no_features <- mean(number_of_unassigned_no_features)
+mean_number_of_assigned_reads <- mean(number_of_assigned_reads)
+
+
+variance_percentages_of_unassigned_ambiguity <- var(percentages_of_unassigned_ambiguity)
+variance_percentages_of_unassigned_no_features <- var(percentages_of_unassigned_no_features)
+variance_percentages_of_percentages_of_assigned_reads <- var(percentages_of_assigned_reads)
+
+variance_number_of_unassigned_ambiguity <- var(number_unassigned_ambiguity)
+variance_number_of_unassigned_no_features <- var(number_of_unassigned_no_features)
+variance_number_of_assigned_reads <- var(number_of_assigned_reads)
+
+```
+
+
+```{r}
+# Create a data frame to store the means and variances
+summary_percentages <- data.frame(mean = c(mean_percentages_of_unassigned_ambiguity,
+                                           mean_percentages_of_unassigned_no_features,
+                                           mean_percentages_of_assigned_reads),
+                                 variance = c(variance_percentages_of_unassigned_ambiguity,
+                                              variance_percentages_of_unassigned_no_features,
+                                          variance_percentages_of_percentages_of_assigned_reads))
+
+summary_numbers <- data.frame(mean = c(mean_number_of_unassigned_ambiguity,
+                                           mean_number_of_unassigned_no_features,
+                                           mean_number_of_assigned_reads),
+                                 variance = c(variance_number_of_unassigned_ambiguity,
+                                              variance_number_of_unassigned_no_features,
+                                          variance_number_of_assigned_reads))
+
+
+# Rename the columns and rows
+colnames(summary_percentages) <- c("mean", "variance")
+rownames(summary_percentages) <- c("perc_unassigned_ambiguity",
+                                   "perc_unassigned_no_features",
+                                   "perc_assigned_reads")
+colnames(summary_numbers) <- c("mean", "variance")
+rownames(summary_numbers) <- c("unassigned_ambiguity",
+                              "unassigned_no_features",
+                               "assigned_reads")
+```
+
+
+```{r}
+# Print the summary tables
+print(summary_percentages)
+```
+
+```{r}
+print(summary_numbers)
+```
+
+```{r}
+counting_summary_b$sample <- data_info$sample_name
+```
+
+```{r}
+write_xlsx(counting_summary_b,"/home/yassine/Downloads/counting_summary_b.xls",col_names = TRUE)
+
+```
+
+
+```{r}
+counting_summary_c<-reshape2::melt(counting_summary_b[,c(1,8,10:12)])
+
+```
+
+```{r}
+counting_summary_c$value<-counting_summary_c$value*100
+counting_summary_c$variable<-factor(counting_summary_c$variable,
+                                    levels=c( "perc_number_of_reads_discarted" ,
+                                              "perc_number_of_reads_assigned",
+                                              "perc_unassigned_NoFeatures" ,
+                                              "perc_unassigned_Ambiguity"))
+```
+
+```{r}
+counting_summary_c
+```
+
+```{r}
+
+# Choose three other distinguishable colors
+other_colors <- brewer.pal(3, "Set2")
+
+plot_a <- ggplot() + 
+  geom_bar(aes(y = value,
+               x = sample, 
+               fill = variable),
+           data = counting_summary_c,
+           stat = "identity") +
+  scale_y_continuous(name = "Percentage") +
+  scale_fill_manual(values = c("#000080", other_colors)) +
+  theme_bw(base_size = 12)+
+  theme(legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 75, hjust = 1))
+
+```
+
+```{r}
+plot_a
+```
+
+
+```{r}
+counting_summary_d <- reshape2::melt(counting_summary_b[, c(1, 5)])
+
+plot_b <- ggplot() + 
+  geom_bar(aes(y = value,
+               x = sample, 
+               fill = variable),
+           data = counting_summary_d,
+           stat = "identity") +  
+  scale_y_continuous(name = "Read pairs sequenced") +
+  scale_fill_manual(values = c("#000080")) +
+  theme_bw(base_size = 12) +
+  theme(legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank())
+
+```
+
+```{r}
+plot_b
+```
+
+
+```{r}
+counting_summary_e <- reshape2::melt(counting_summary_b[, c(1, 2)])
+
+plot_c <- ggplot() + 
+  geom_bar(aes(y = value,
+               x = sample, 
+               fill = variable),
+           data = counting_summary_e,
+           stat = "identity") +
+  scale_y_continuous(name = "Read pairs in annotation") +
+  scale_fill_manual(values = c("#000080")) +
+  geom_hline(yintercept = 10^6,
+             linetype = "dashed",
+             color = "gray",
+             size = 1) +
+  theme_bw(base_size = 12) +
+  theme(legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank())
+
+```
+```{r}
+plot_c
+```
+
+
+
+```{r}
+counting_summary_f <- reshape2::melt(counting_summary_b[, c(1, 10)])
+
+plot_d <- ggplot() + 
+  geom_bar(aes(y = value,
+               x = sample, 
+               fill = variable), 
+           data = counting_summary_f,
+           stat = "identity") +  
+  scale_y_continuous(name = "Proportion reads \n matching annotation") +
+  scale_fill_manual(values = c("#000080")) +
+  theme_bw(base_size = 12) +
+  theme(legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank())
+
+
+```
+
+```{r}
+plot_d
+```
+
+```{r}
+
+grid <- plot_grid(plot_b,plot_c,plot_d,plot_a, ncol = 1,align = 'v')
+
+```
+
+```{r}
+grid
+```
+
+```{r}
+ggsave(filename="/home/yassine/Downloads/between_tissue/Figures/read_count_summary.png",
+       plot = grid, 
+       width = 10, 
+       height = 10)
+
+```
