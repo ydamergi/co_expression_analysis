@@ -1,0 +1,341 @@
+# Load libraries
+```{r}
+.libPaths("/usr/lib/R/site-library")
+library("edgeR", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DESeq2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DEsingle", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("biomaRt",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("goseq" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("VennDiagram", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggpubr", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("Rtsne", quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("MEGENA",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("DGCA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('dplyr', quietly = TRUE,lib.loc="/usr/lib/R/site-library")
+library("ggplot2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggrepel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gridExtra",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
+library("readr" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ggfortify" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("cowplot" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("tidyverse", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("WGCNA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("reshape2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("foreach", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("doParallel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("bigmemory", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gtools", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("data.table", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("flashClust", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("dendextend", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library('vegan', quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("ade4", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("gridGraphics", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library("networkD3", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(readxl, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(dplyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(tidyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+library(plotly, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
+
+```
+
+# Run the RNA Seq R script first to be able to Load the annotation 
+```{r}
+annotation.ensembl.symbol <-read.table(file = "/home/yassine/Downloads/between_tissue/annotation.ensembl.symbol.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+
+gene.length<-read.table(file = "/home/yassine/Downloads/between_tissue/gene.length.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+
+annotation.GO.biomart<-read.table (file ="/home/yassine/Downloads/between_tissue/annotation.GO.biomart.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+```
+
+
+```{r}
+count_data_b<-read.table (file ="/home/yassine/Downloads/count_data_b.txt",
+                          header= TRUE,
+                          sep= "\t")
+rownames(count_data_b)<-count_data_annotated$Row.names
+```
+
+```{r}
+columns_to_remove <- grepl("J148B_hypothalamus_6|H273B_hypothalamus_9", colnames(count_data_b))
+count_data_b <- count_data_b[, !columns_to_remove]
+```
+
+
+```{r}
+lib_size <- base::colSums(count_data_b) # calculate the library size for each sample in the count_data_b data frame
+# Calculate the normalization factors for each sample in the count_data_b data frame
+norm_factors <- edgeR::calcNormFactors(object = count_data_b,
+                                       lib.size = lib_size,
+                                       method = "TMM")
+```
+
+```{r}
+count_data_annotated_length<-gene.length[gene.length$ensembl_gene_id %in% rownames(count_data_b), 2]
+```
+
+```{r}
+#FPKM
+data_fpkm<-edgeR::rpkm(sweep(count_data_b, 2, norm_factors, "/"), count_data_annotated_length)
+rownames(data_fpkm)<-rownames(count_data_b)
+
+#CPM
+data_cpm<-edgeR::cpm(sweep(count_data_b, 2, norm_factors, "/"),normalized.lib.sizes = TRUE,log = FALSE)
+rownames(data_cpm)<-rownames(count_data_b)
+
+#TPM
+x <- count_data_b / count_data_annotated_length
+data_tpm <- data.frame(t( t(x) * 1e6 / colSums(x) ))
+rownames(data_tpm)<-rownames(count_data_b)
+```
+
+
+```{r}
+# Removes genes that doesn't have fpkm_count > 1 in at least 10 samples 
+keep<-rowSums(data_fpkm>1) >=10
+data_fpkm_filtered<-data_fpkm[keep,]
+
+# Removes genes that doesn't have cpm_count > 1 in at least 10 samples 
+keep<-rowSums(data_cpm>1) >= 10
+data_cpm_filtered<-data_cpm[keep,]
+# Only the  genes that verifies both conditions above 
+
+genes_expressed<-intersect(rownames(data_fpkm_filtered), rownames(data_cpm_filtered))
+```
+
+
+
+
+```{r}
+data_tpm<-data_tpm[rownames(data_tpm) %in% genes_expressed,] # tpm measures of the filtred genes
+
+data_fpkm_filtered<-data_fpkm_filtered[rownames(data_fpkm_filtered) %in% genes_expressed,] # fpkm measures of the filtred genes
+
+data_cpm_filtered<-data_cpm_filtered[rownames(data_cpm_filtered) %in% genes_expressed,] # cpm measure of the filtred genes
+
+# Un-normolized count of the filtred genes 
+count_data_filtered<-count_data_b[rownames(count_data_b) %in% genes_expressed,]
+```
+
+
+```{r}
+# Summary table of the gene types that have passed the filtring steps :
+# raw counts > 0 for all samples 
+# fpkm > 1  across at least 9 samples 
+# cpm > 1 across at least 9 samples
+
+table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype)
+
+
+```
+
+```{r}
+# Get the number of reads for each gene type
+nreads_per_type <- table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype)
+
+# Calculate the total number of reads
+total_reads <- sum(nreads_per_type)
+
+# Calculate the proportion of reads for each gene type
+proportions_per_type <- nreads_per_type / total_reads
+
+# Print the proportions of reads for each gene type
+# Combine the two tables
+combined_table <- cbind(table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype), proportions_per_type)
+```
+
+
+```{r}
+# Print the combined table
+knitr::kable(combined_table,
+             format = 'pandoc')
+
+```
+
+
+
+```{r}
+write.table(count_data_filtered,
+            file = "/home/yassine/Downloads/filtered_count_data.txt",
+            sep  = "\t")
+#system("bzip2 "/home/yassine/Downloads/filtered_count_data.txt")
+```
+
+
+```{r}
+# Number of CPU cores to use
+num_cores <- 4
+# Register parallel cluster
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+```
+
+```{r}
+colnames(count_data_annotated)[2:133] <- data_info$sample_name
+columns_to_remove <- grepl("J148B_hypothalamus_6|H273B_hypothalamus_9", colnames(count_data_b))
+count_data_annotated <- count_data_annotated[, !columns_to_remove]
+```
+
+```{r}
+count_data_filtered <-read.table(file = "/home/yassine/Downloads/filtered_count_data.txt",
+                                       header= TRUE, 
+                                       sep= "\t")
+```
+
+```{r}
+count_data_filtered
+```
+
+
+```{r}
+lib_size <- base::colSums(count_data_filtered)
+
+norm_factors <- calcNormFactors(object = count_data_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_count_data <- sweep(count_data_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_count_data <-asinh(CTF_normalized_count_data)
+```
+
+```{r}
+write.table(asinh_transf_CTF_normalized_count_data,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_count_data.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+```
+
+```{r}
+asinh_transf_CTF_normalized_count_data
+```
+```{r}
+pwbc_columns_6 <- grep("pwbc_6", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pwbc_6 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_6]
+
+pwbc_columns_9 <- grep("pwbc_9", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pwbc_9 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_9]
+
+pwbc_columns_19 <- grep("pwbc_19", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pwbc_19 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_19]
+
+endometrium_columns_6 <- grep("endometrium_6", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_endometrium_6 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_6]
+
+endometrium_columns_9 <- grep("endometrium_9", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_endometrium_9 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_9]
+
+endometrium_columns_19 <- grep("endometrium_19", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_endometrium_19 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_19]
+
+hypothalamus_columns_6 <- grep("hypothalamus_6", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_hypothalamus_6 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_6]
+
+hypothalamus_columns_9 <- grep("hypothalamus_9", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_hypothalamus_9 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_9]
+
+hypothalamus_columns_19 <- grep("hypothalamus_19", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_hypothalamus_19 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_19]
+
+pituitary_columns_6 <- grep("pituitary_6", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pituitary_6 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_6]
+
+pituitary_columns_9 <- grep("pituitary_9", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pituitary_9 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_9]
+
+pituitary_columns_19 <- grep("pituitary_19", colnames(asinh_transf_CTF_normalized_count_data))
+asinh_transf_CTF_normalized_pituitary_19 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_19]
+```
+
+```{r}
+write.table(asinh_transf_CTF_normalized_pwbc_6,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_6.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+
+write.table(asinh_transf_CTF_normalized_pwbc_9,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_9.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+
+write.table(asinh_transf_CTF_normalized_pwbc_19,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_19.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+```
+
+
+```{r}
+write.table(asinh_transf_CTF_normalized_endometrium_6,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_6.txt",
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+
+write.table(asinh_transf_CTF_normalized_endometrium_9,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_9.txt",
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+write.table(asinh_transf_CTF_normalized_endometrium_19,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_19.txt",
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+```
+
+
+```{r}
+write.table(asinh_transf_CTF_normalized_hypothalamus_6,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_6.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+write.table(asinh_transf_CTF_normalized_hypothalamus_9,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_9.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+write.table(asinh_transf_CTF_normalized_hypothalamus_19,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_19.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+```
+
+
+```{r}
+write.table(asinh_transf_CTF_normalized_pituitary_6,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_6.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+write.table(asinh_transf_CTF_normalized_pituitary_9,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_9.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+write.table(asinh_transf_CTF_normalized_pituitary_19,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_19.txt",
+            quote = TRUE,
+            sep = "\t",
+            row.names = TRUE,
+            col.names = TRUE)
+```
