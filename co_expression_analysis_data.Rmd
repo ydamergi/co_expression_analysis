@@ -38,7 +38,6 @@ library(tidyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
 library(plotly, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
 
 ```
-
 # Run the RNA Seq R script first to be able to Load the annotation 
 ```{r}
 annotation.ensembl.symbol <-read.table(file = "/home/yassine/Downloads/between_tissue/annotation.ensembl.symbol.txt",
@@ -67,107 +66,6 @@ columns_to_remove <- grepl("J148B_hypothalamus_6|H273B_hypothalamus_9", colnames
 count_data_b <- count_data_b[, !columns_to_remove]
 ```
 
-
-```{r}
-lib_size <- base::colSums(count_data_b) # calculate the library size for each sample in the count_data_b data frame
-# Calculate the normalization factors for each sample in the count_data_b data frame
-norm_factors <- edgeR::calcNormFactors(object = count_data_b,
-                                       lib.size = lib_size,
-                                       method = "TMM")
-```
-
-```{r}
-count_data_annotated_length<-gene.length[gene.length$ensembl_gene_id %in% rownames(count_data_b), 2]
-```
-
-```{r}
-#FPKM
-data_fpkm<-edgeR::rpkm(sweep(count_data_b, 2, norm_factors, "/"), count_data_annotated_length)
-rownames(data_fpkm)<-rownames(count_data_b)
-
-#CPM
-data_cpm<-edgeR::cpm(sweep(count_data_b, 2, norm_factors, "/"),normalized.lib.sizes = TRUE,log = FALSE)
-rownames(data_cpm)<-rownames(count_data_b)
-
-#TPM
-x <- count_data_b / count_data_annotated_length
-data_tpm <- data.frame(t( t(x) * 1e6 / colSums(x) ))
-rownames(data_tpm)<-rownames(count_data_b)
-```
-
-
-```{r}
-# Removes genes that doesn't have fpkm_count > 1 in at least 10 samples 
-keep<-rowSums(data_fpkm>1) >=10
-data_fpkm_filtered<-data_fpkm[keep,]
-
-# Removes genes that doesn't have cpm_count > 1 in at least 10 samples 
-keep<-rowSums(data_cpm>1) >= 10
-data_cpm_filtered<-data_cpm[keep,]
-# Only the  genes that verifies both conditions above 
-
-genes_expressed<-intersect(rownames(data_fpkm_filtered), rownames(data_cpm_filtered))
-```
-
-
-
-
-```{r}
-data_tpm<-data_tpm[rownames(data_tpm) %in% genes_expressed,] # tpm measures of the filtred genes
-
-data_fpkm_filtered<-data_fpkm_filtered[rownames(data_fpkm_filtered) %in% genes_expressed,] # fpkm measures of the filtred genes
-
-data_cpm_filtered<-data_cpm_filtered[rownames(data_cpm_filtered) %in% genes_expressed,] # cpm measure of the filtred genes
-
-# Un-normolized count of the filtred genes 
-count_data_filtered<-count_data_b[rownames(count_data_b) %in% genes_expressed,]
-```
-
-
-```{r}
-# Summary table of the gene types that have passed the filtring steps :
-# raw counts > 0 for all samples 
-# fpkm > 1  across at least 9 samples 
-# cpm > 1 across at least 9 samples
-
-table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype)
-
-
-```
-
-```{r}
-# Get the number of reads for each gene type
-nreads_per_type <- table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype)
-
-# Calculate the total number of reads
-total_reads <- sum(nreads_per_type)
-
-# Calculate the proportion of reads for each gene type
-proportions_per_type <- nreads_per_type / total_reads
-
-# Print the proportions of reads for each gene type
-# Combine the two tables
-combined_table <- cbind(table(annotation.ensembl.symbol[annotation.ensembl.symbol$ensembl_gene_id %in% genes_expressed, ]$gene_biotype), proportions_per_type)
-```
-
-
-```{r}
-# Print the combined table
-knitr::kable(combined_table,
-             format = 'pandoc')
-
-```
-
-
-
-```{r}
-write.table(count_data_filtered,
-            file = "/home/yassine/Downloads/filtered_count_data.txt",
-            sep  = "\t")
-#system("bzip2 "/home/yassine/Downloads/filtered_count_data.txt")
-```
-
-
 ```{r}
 # Number of CPU cores to use
 num_cores <- 4
@@ -177,165 +75,827 @@ registerDoParallel(cl)
 ```
 
 ```{r}
-colnames(count_data_annotated)[2:133] <- data_info$sample_name
-columns_to_remove <- grepl("J148B_hypothalamus_6|H273B_hypothalamus_9", colnames(count_data_b))
-count_data_annotated <- count_data_annotated[, !columns_to_remove]
+pwbc_columns_6 <- grep("pwbc_6", colnames(count_data_b))
+count_data_pwbc_6 <- count_data_b[, pwbc_columns_6]
 ```
 
 ```{r}
-count_data_filtered <-read.table(file = "/home/yassine/Downloads/filtered_count_data.txt",
-                                       header= TRUE, 
-                                       sep= "\t")
+count_data_pwbc_6$geneID <- rownames(count_data_pwbc_6)
 ```
 
 ```{r}
-count_data_filtered
+pwbc_6_count_data_annotated<-merge(count_data_pwbc_6,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pwbc_6 <- count_data_pwbc_6[, -ncol(count_data_pwbc_6)]
+
+pwbc_6_gene_length<-pwbc_6_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pwbc_6 / pwbc_6_gene_length
+pwbc_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_6_fpkm<-as.data.frame(edgeR::rpkm(count_data_pwbc_6, pwbc_6_gene_length))
+pwbc_6_cpm<-as.data.frame(edgeR::cpm(count_data_pwbc_6))
+pwbc_6_cpm_filtered<-pwbc_6_cpm[rowSums(pwbc_6_cpm>1) > 9,]
+pwbc_6_tpm_filtered<-pwbc_6_fpkm[rowSums(pwbc_6_tpm>1) > 9,]
+
+genes_expressed_pwbc_6<-intersect(rownames(pwbc_6_cpm_filtered), rownames(pwbc_6_tpm_filtered))
+
+pwbc_6_tpm_filtered<-pwbc_6_tpm_filtered[rownames(pwbc_6_tpm_filtered) %in% genes_expressed_pwbc_6,]
+pwbc_6_cpm_filtered<-pwbc_6_cpm_filtered[rownames(pwbc_6_cpm_filtered) %in% genes_expressed_pwbc_6,]
+
+pwbc_6_count_filtered<-count_data_pwbc_6[rownames(count_data_pwbc_6) %in% genes_expressed_pwbc_6,]
+
+pwbc_6_tpm_filtered<-pwbc_6_tpm_filtered[complete.cases(pwbc_6_tpm_filtered),]
+pwbc_6_count_filtered<-pwbc_6_count_filtered[complete.cases(pwbc_6_count_filtered),]
+
+```
+
+```{r}
+write_delim(pwbc_6_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pwbc_6_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
 ```
 
 
 ```{r}
-lib_size <- base::colSums(count_data_filtered)
-
-norm_factors <- calcNormFactors(object = count_data_filtered,
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pwbc_6_count_filtered)
+norm_factors <- calcNormFactors(object = pwbc_6_count_filtered,
                                 lib.size = lib_size,
                                 method = "TMM")
-CTF_normalized_count_data <- sweep(count_data_filtered,2,norm_factors,"/")
-asinh_transf_CTF_normalized_count_data <-asinh(CTF_normalized_count_data)
+CTF_normalized_pwbc_6 <- sweep(pwbc_6_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pwbc_6<-asinh(CTF_normalized_pwbc_6)
 ```
 
-```{r}
-write.table(asinh_transf_CTF_normalized_count_data,
-            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_count_data.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-```
 
 ```{r}
-asinh_transf_CTF_normalized_count_data
-```
-```{r}
-pwbc_columns_6 <- grep("pwbc_6", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pwbc_6 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_6]
-
-pwbc_columns_9 <- grep("pwbc_9", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pwbc_9 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_9]
-
-pwbc_columns_19 <- grep("pwbc_19", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pwbc_19 <- asinh_transf_CTF_normalized_count_data[, pwbc_columns_19]
-
-endometrium_columns_6 <- grep("endometrium_6", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_endometrium_6 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_6]
-
-endometrium_columns_9 <- grep("endometrium_9", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_endometrium_9 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_9]
-
-endometrium_columns_19 <- grep("endometrium_19", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_endometrium_19 <- asinh_transf_CTF_normalized_count_data[, endometrium_columns_19]
-
-hypothalamus_columns_6 <- grep("hypothalamus_6", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_hypothalamus_6 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_6]
-
-hypothalamus_columns_9 <- grep("hypothalamus_9", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_hypothalamus_9 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_9]
-
-hypothalamus_columns_19 <- grep("hypothalamus_19", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_hypothalamus_19 <- asinh_transf_CTF_normalized_count_data[, hypothalamus_columns_19]
-
-pituitary_columns_6 <- grep("pituitary_6", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pituitary_6 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_6]
-
-pituitary_columns_9 <- grep("pituitary_9", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pituitary_9 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_9]
-
-pituitary_columns_19 <- grep("pituitary_19", colnames(asinh_transf_CTF_normalized_count_data))
-asinh_transf_CTF_normalized_pituitary_19 <- asinh_transf_CTF_normalized_count_data[, pituitary_columns_19]
-```
-
-```{r}
-write.table(asinh_transf_CTF_normalized_pwbc_6,
+write_delim(asinh_transf_CTF_normalized_pwbc_6,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_6.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
 
-write.table(asinh_transf_CTF_normalized_pwbc_9,
+
+
+```{r}
+pwbc_columns_9<- grep("pwbc_9", colnames(count_data_b))
+count_data_pwbc_9<- count_data_b[, pwbc_columns_9]
+```
+
+```{r}
+count_data_pwbc_9$geneID <- rownames(count_data_pwbc_9)
+```
+
+```{r}
+pwbc_9_count_data_annotated<-merge(count_data_pwbc_9,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pwbc_9<- count_data_pwbc_9[, -ncol(count_data_pwbc_9)]
+
+pwbc_9_gene_length<-pwbc_9_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pwbc_9/ pwbc_9_gene_length
+pwbc_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_9_fpkm<-as.data.frame(edgeR::rpkm(count_data_pwbc_9, pwbc_9_gene_length))
+pwbc_9_cpm<-as.data.frame(edgeR::cpm(count_data_pwbc_9))
+pwbc_9_cpm_filtered<-pwbc_9_cpm[rowSums(pwbc_9_cpm>1) > 9,]
+pwbc_9_tpm_filtered<-pwbc_9_fpkm[rowSums(pwbc_9_tpm>1) > 9,]
+
+genes_expressed_pwbc_9<-intersect(rownames(pwbc_9_cpm_filtered), rownames(pwbc_9_tpm_filtered))
+
+pwbc_9_tpm_filtered<-pwbc_9_tpm_filtered[rownames(pwbc_9_tpm_filtered) %in% genes_expressed_pwbc_9,]
+pwbc_9_cpm_filtered<-pwbc_9_cpm_filtered[rownames(pwbc_9_cpm_filtered) %in% genes_expressed_pwbc_9,]
+
+pwbc_9_count_filtered<-count_data_pwbc_9[rownames(count_data_pwbc_9) %in% genes_expressed_pwbc_9,]
+
+pwbc_9_tpm_filtered<-pwbc_9_tpm_filtered[complete.cases(pwbc_9_tpm_filtered),]
+pwbc_9_count_filtered<-pwbc_9_count_filtered[complete.cases(pwbc_9_count_filtered),]
+
+```
+
+```{r}
+write_delim(pwbc_9_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pwbc_9_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pwbc_9_count_filtered)
+norm_factors <- calcNormFactors(object = pwbc_9_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_pwbc_9 <- sweep(pwbc_9_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pwbc_9<-asinh(CTF_normalized_pwbc_9)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_pwbc_9,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_9.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
 
-write.table(asinh_transf_CTF_normalized_pwbc_19,
+
+```{r}
+pwbc_columns_19<- grep("pwbc_19", colnames(count_data_b))
+count_data_pwbc_19<- count_data_b[, pwbc_columns_19]
+```
+
+```{r}
+count_data_pwbc_19$geneID <- rownames(count_data_pwbc_19)
+```
+
+```{r}
+pwbc_19_count_data_annotated<-merge(count_data_pwbc_19,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pwbc_19<- count_data_pwbc_19[, -ncol(count_data_pwbc_19)]
+
+pwbc_19_gene_length<-pwbc_19_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pwbc_19/ pwbc_19_gene_length
+pwbc_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pwbc_19_fpkm<-as.data.frame(edgeR::rpkm(count_data_pwbc_19, pwbc_19_gene_length))
+pwbc_19_cpm<-as.data.frame(edgeR::cpm(count_data_pwbc_19))
+pwbc_19_cpm_filtered<-pwbc_19_cpm[rowSums(pwbc_19_cpm>1) > 9,]
+pwbc_19_tpm_filtered<-pwbc_19_fpkm[rowSums(pwbc_19_tpm>1) > 9,]
+
+genes_expressed_pwbc_19<-intersect(rownames(pwbc_19_cpm_filtered), rownames(pwbc_19_tpm_filtered))
+
+pwbc_19_tpm_filtered<-pwbc_19_tpm_filtered[rownames(pwbc_19_tpm_filtered) %in% genes_expressed_pwbc_19,]
+pwbc_19_cpm_filtered<-pwbc_19_cpm_filtered[rownames(pwbc_19_cpm_filtered) %in% genes_expressed_pwbc_19,]
+
+pwbc_19_count_filtered<-count_data_pwbc_19[rownames(count_data_pwbc_19) %in% genes_expressed_pwbc_19,]
+
+pwbc_19_tpm_filtered<-pwbc_19_tpm_filtered[complete.cases(pwbc_19_tpm_filtered),]
+pwbc_19_count_filtered<-pwbc_19_count_filtered[complete.cases(pwbc_19_count_filtered),]
+
+```
+
+```{r}
+write_delim(pwbc_19_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pwbc_19_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pwbc_19_count_filtered)
+norm_factors <- calcNormFactors(object = pwbc_19_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_pwbc_19 <- sweep(pwbc_19_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pwbc_19<-asinh(CTF_normalized_pwbc_19)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_pwbc_19,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pwbc_19.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
+
+
+#-------------
+
+```{r}
+endometrium_columns_6 <- grep("endometrium_6", colnames(count_data_b))
+count_data_endometrium_6 <- count_data_b[, endometrium_columns_6]
+```
+
+```{r}
+count_data_endometrium_6$geneID <- rownames(count_data_endometrium_6)
+```
+
+```{r}
+endometrium_6_count_data_annotated<-merge(count_data_endometrium_6,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_endometrium_6 <- count_data_endometrium_6[, -ncol(count_data_endometrium_6)]
+
+endometrium_6_gene_length<-endometrium_6_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_endometrium_6 / endometrium_6_gene_length
+endometrium_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_6_fpkm<-as.data.frame(edgeR::rpkm(count_data_endometrium_6, endometrium_6_gene_length))
+endometrium_6_cpm<-as.data.frame(edgeR::cpm(count_data_endometrium_6))
+endometrium_6_cpm_filtered<-endometrium_6_cpm[rowSums(endometrium_6_cpm>1) > 9,]
+endometrium_6_tpm_filtered<-endometrium_6_fpkm[rowSums(endometrium_6_tpm>1) > 9,]
+
+genes_expressed_endometrium_6<-intersect(rownames(endometrium_6_cpm_filtered), rownames(endometrium_6_tpm_filtered))
+
+endometrium_6_tpm_filtered<-endometrium_6_tpm_filtered[rownames(endometrium_6_tpm_filtered) %in% genes_expressed_endometrium_6,]
+endometrium_6_cpm_filtered<-endometrium_6_cpm_filtered[rownames(endometrium_6_cpm_filtered) %in% genes_expressed_endometrium_6,]
+
+endometrium_6_count_filtered<-count_data_endometrium_6[rownames(count_data_endometrium_6) %in% genes_expressed_endometrium_6,]
+
+endometrium_6_tpm_filtered<-endometrium_6_tpm_filtered[complete.cases(endometrium_6_tpm_filtered),]
+endometrium_6_count_filtered<-endometrium_6_count_filtered[complete.cases(endometrium_6_count_filtered),]
+
+```
+
+```{r}
+write_delim(endometrium_6_count_filtered,
+            "/home/yassine/Downloads/between_tissue/endometrium_6_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
 ```
 
 
 ```{r}
-write.table(asinh_transf_CTF_normalized_endometrium_6,
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(endometrium_6_count_filtered)
+norm_factors <- calcNormFactors(object = endometrium_6_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_endometrium_6 <- sweep(endometrium_6_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_endometrium_6<-asinh(CTF_normalized_endometrium_6)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_endometrium_6,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_6.txt",
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
 
-write.table(asinh_transf_CTF_normalized_endometrium_9,
+
+
+```{r}
+endometrium_columns_9<- grep("endometrium_9", colnames(count_data_b))
+count_data_endometrium_9<- count_data_b[, endometrium_columns_9]
+```
+
+```{r}
+count_data_endometrium_9$geneID <- rownames(count_data_endometrium_9)
+```
+
+```{r}
+endometrium_9_count_data_annotated<-merge(count_data_endometrium_9,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_endometrium_9<- count_data_endometrium_9[, -ncol(count_data_endometrium_9)]
+
+endometrium_9_gene_length<-endometrium_9_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_endometrium_9/ endometrium_9_gene_length
+endometrium_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_9_fpkm<-as.data.frame(edgeR::rpkm(count_data_endometrium_9, endometrium_9_gene_length))
+endometrium_9_cpm<-as.data.frame(edgeR::cpm(count_data_endometrium_9))
+endometrium_9_cpm_filtered<-endometrium_9_cpm[rowSums(endometrium_9_cpm>1) > 9,]
+endometrium_9_tpm_filtered<-endometrium_9_fpkm[rowSums(endometrium_9_tpm>1) > 9,]
+
+genes_expressed_endometrium_9<-intersect(rownames(endometrium_9_cpm_filtered), rownames(endometrium_9_tpm_filtered))
+
+endometrium_9_tpm_filtered<-endometrium_9_tpm_filtered[rownames(endometrium_9_tpm_filtered) %in% genes_expressed_endometrium_9,]
+endometrium_9_cpm_filtered<-endometrium_9_cpm_filtered[rownames(endometrium_9_cpm_filtered) %in% genes_expressed_endometrium_9,]
+
+endometrium_9_count_filtered<-count_data_endometrium_9[rownames(count_data_endometrium_9) %in% genes_expressed_endometrium_9,]
+
+endometrium_9_tpm_filtered<-endometrium_9_tpm_filtered[complete.cases(endometrium_9_tpm_filtered),]
+endometrium_9_count_filtered<-endometrium_9_count_filtered[complete.cases(endometrium_9_count_filtered),]
+
+```
+
+```{r}
+write_delim(endometrium_9_count_filtered,
+            "/home/yassine/Downloads/between_tissue/endometrium_9_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(endometrium_9_count_filtered)
+norm_factors <- calcNormFactors(object = endometrium_9_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_endometrium_9 <- sweep(endometrium_9_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_endometrium_9<-asinh(CTF_normalized_endometrium_9)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_endometrium_9,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_9.txt",
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-write.table(asinh_transf_CTF_normalized_endometrium_19,
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+endometrium_columns_19<- grep("endometrium_19", colnames(count_data_b))
+count_data_endometrium_19<- count_data_b[, endometrium_columns_19]
+```
+
+```{r}
+count_data_endometrium_19$geneID <- rownames(count_data_endometrium_19)
+```
+
+```{r}
+endometrium_19_count_data_annotated<-merge(count_data_endometrium_19,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_endometrium_19<- count_data_endometrium_19[, -ncol(count_data_endometrium_19)]
+
+endometrium_19_gene_length<-endometrium_19_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_endometrium_19/ endometrium_19_gene_length
+endometrium_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+endometrium_19_fpkm<-as.data.frame(edgeR::rpkm(count_data_endometrium_19, endometrium_19_gene_length))
+endometrium_19_cpm<-as.data.frame(edgeR::cpm(count_data_endometrium_19))
+endometrium_19_cpm_filtered<-endometrium_19_cpm[rowSums(endometrium_19_cpm>1) > 9,]
+endometrium_19_tpm_filtered<-endometrium_19_fpkm[rowSums(endometrium_19_tpm>1) > 9,]
+
+genes_expressed_endometrium_19<-intersect(rownames(endometrium_19_cpm_filtered), rownames(endometrium_19_tpm_filtered))
+
+endometrium_19_tpm_filtered<-endometrium_19_tpm_filtered[rownames(endometrium_19_tpm_filtered) %in% genes_expressed_endometrium_19,]
+endometrium_19_cpm_filtered<-endometrium_19_cpm_filtered[rownames(endometrium_19_cpm_filtered) %in% genes_expressed_endometrium_19,]
+
+endometrium_19_count_filtered<-count_data_endometrium_19[rownames(count_data_endometrium_19) %in% genes_expressed_endometrium_19,]
+
+endometrium_19_tpm_filtered<-endometrium_19_tpm_filtered[complete.cases(endometrium_19_tpm_filtered),]
+endometrium_19_count_filtered<-endometrium_19_count_filtered[complete.cases(endometrium_19_count_filtered),]
+
+```
+
+```{r}
+write_delim(endometrium_19_count_filtered,
+            "/home/yassine/Downloads/between_tissue/endometrium_19_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(endometrium_19_count_filtered)
+norm_factors <- calcNormFactors(object = endometrium_19_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_endometrium_19 <- sweep(endometrium_19_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_endometrium_19<-asinh(CTF_normalized_endometrium_19)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_endometrium_19,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_endometrium_19.txt",
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
+
+
+#-----------------
+
+
+```{r}
+hypothalamus_columns_6 <- grep("hypothalamus_6", colnames(count_data_b))
+count_data_hypothalamus_6 <- count_data_b[, hypothalamus_columns_6]
+```
+
+```{r}
+count_data_hypothalamus_6$geneID <- rownames(count_data_hypothalamus_6)
+```
+
+```{r}
+hypothalamus_6_count_data_annotated<-merge(count_data_hypothalamus_6,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_hypothalamus_6 <- count_data_hypothalamus_6[, -ncol(count_data_hypothalamus_6)]
+
+hypothalamus_6_gene_length<-hypothalamus_6_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_hypothalamus_6 / hypothalamus_6_gene_length
+hypothalamus_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_6_fpkm<-as.data.frame(edgeR::rpkm(count_data_hypothalamus_6, hypothalamus_6_gene_length))
+hypothalamus_6_cpm<-as.data.frame(edgeR::cpm(count_data_hypothalamus_6))
+hypothalamus_6_cpm_filtered<-hypothalamus_6_cpm[rowSums(hypothalamus_6_cpm>1) > 9,]
+hypothalamus_6_tpm_filtered<-hypothalamus_6_fpkm[rowSums(hypothalamus_6_tpm>1) > 9,]
+
+genes_expressed_hypothalamus_6<-intersect(rownames(hypothalamus_6_cpm_filtered), rownames(hypothalamus_6_tpm_filtered))
+
+hypothalamus_6_tpm_filtered<-hypothalamus_6_tpm_filtered[rownames(hypothalamus_6_tpm_filtered) %in% genes_expressed_hypothalamus_6,]
+hypothalamus_6_cpm_filtered<-hypothalamus_6_cpm_filtered[rownames(hypothalamus_6_cpm_filtered) %in% genes_expressed_hypothalamus_6,]
+
+hypothalamus_6_count_filtered<-count_data_hypothalamus_6[rownames(count_data_hypothalamus_6) %in% genes_expressed_hypothalamus_6,]
+
+hypothalamus_6_tpm_filtered<-hypothalamus_6_tpm_filtered[complete.cases(hypothalamus_6_tpm_filtered),]
+hypothalamus_6_count_filtered<-hypothalamus_6_count_filtered[complete.cases(hypothalamus_6_count_filtered),]
+
+```
+
+```{r}
+write_delim(hypothalamus_6_count_filtered,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_6_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
 ```
 
 
 ```{r}
-write.table(asinh_transf_CTF_normalized_hypothalamus_6,
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(hypothalamus_6_count_filtered)
+norm_factors <- calcNormFactors(object = hypothalamus_6_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_hypothalamus_6 <- sweep(hypothalamus_6_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_hypothalamus_6<-asinh(CTF_normalized_hypothalamus_6)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_hypothalamus_6,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_6.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-write.table(asinh_transf_CTF_normalized_hypothalamus_9,
-            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_9.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-write.table(asinh_transf_CTF_normalized_hypothalamus_19,
-            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_19.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
+```
+
+
+
+```{r}
+hypothalamus_columns_9<- grep("hypothalamus_9", colnames(count_data_b))
+count_data_hypothalamus_9<- count_data_b[, hypothalamus_columns_9]
+```
+
+```{r}
+count_data_hypothalamus_9$geneID <- rownames(count_data_hypothalamus_9)
+```
+
+```{r}
+hypothalamus_9_count_data_annotated<-merge(count_data_hypothalamus_9,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_hypothalamus_9<- count_data_hypothalamus_9[, -ncol(count_data_hypothalamus_9)]
+
+hypothalamus_9_gene_length<-hypothalamus_9_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_hypothalamus_9/ hypothalamus_9_gene_length
+hypothalamus_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_9_fpkm<-as.data.frame(edgeR::rpkm(count_data_hypothalamus_9, hypothalamus_9_gene_length))
+hypothalamus_9_cpm<-as.data.frame(edgeR::cpm(count_data_hypothalamus_9))
+hypothalamus_9_cpm_filtered<-hypothalamus_9_cpm[rowSums(hypothalamus_9_cpm>1) > 9,]
+hypothalamus_9_tpm_filtered<-hypothalamus_9_fpkm[rowSums(hypothalamus_9_tpm>1) > 9,]
+
+genes_expressed_hypothalamus_9<-intersect(rownames(hypothalamus_9_cpm_filtered), rownames(hypothalamus_9_tpm_filtered))
+
+hypothalamus_9_tpm_filtered<-hypothalamus_9_tpm_filtered[rownames(hypothalamus_9_tpm_filtered) %in% genes_expressed_hypothalamus_9,]
+hypothalamus_9_cpm_filtered<-hypothalamus_9_cpm_filtered[rownames(hypothalamus_9_cpm_filtered) %in% genes_expressed_hypothalamus_9,]
+
+hypothalamus_9_count_filtered<-count_data_hypothalamus_9[rownames(count_data_hypothalamus_9) %in% genes_expressed_hypothalamus_9,]
+
+hypothalamus_9_tpm_filtered<-hypothalamus_9_tpm_filtered[complete.cases(hypothalamus_9_tpm_filtered),]
+hypothalamus_9_count_filtered<-hypothalamus_9_count_filtered[complete.cases(hypothalamus_9_count_filtered),]
+
+```
+
+```{r}
+write_delim(hypothalamus_9_count_filtered,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_9_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
 ```
 
 
 ```{r}
-write.table(asinh_transf_CTF_normalized_pituitary_6,
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(hypothalamus_9_count_filtered)
+norm_factors <- calcNormFactors(object = hypothalamus_9_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_hypothalamus_9 <- sweep(hypothalamus_9_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_hypothalamus_9<-asinh(CTF_normalized_hypothalamus_9)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_hypothalamus_9,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_9.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+hypothalamus_columns_19<- grep("hypothalamus_19", colnames(count_data_b))
+count_data_hypothalamus_19<- count_data_b[, hypothalamus_columns_19]
+```
+
+```{r}
+count_data_hypothalamus_19$geneID <- rownames(count_data_hypothalamus_19)
+```
+
+```{r}
+hypothalamus_19_count_data_annotated<-merge(count_data_hypothalamus_19,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_hypothalamus_19<- count_data_hypothalamus_19[, -ncol(count_data_hypothalamus_19)]
+
+hypothalamus_19_gene_length<-hypothalamus_19_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_hypothalamus_19/ hypothalamus_19_gene_length
+hypothalamus_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+hypothalamus_19_fpkm<-as.data.frame(edgeR::rpkm(count_data_hypothalamus_19, hypothalamus_19_gene_length))
+hypothalamus_19_cpm<-as.data.frame(edgeR::cpm(count_data_hypothalamus_19))
+hypothalamus_19_cpm_filtered<-hypothalamus_19_cpm[rowSums(hypothalamus_19_cpm>1) > 9,]
+hypothalamus_19_tpm_filtered<-hypothalamus_19_fpkm[rowSums(hypothalamus_19_tpm>1) > 9,]
+
+genes_expressed_hypothalamus_19<-intersect(rownames(hypothalamus_19_cpm_filtered), rownames(hypothalamus_19_tpm_filtered))
+
+hypothalamus_19_tpm_filtered<-hypothalamus_19_tpm_filtered[rownames(hypothalamus_19_tpm_filtered) %in% genes_expressed_hypothalamus_19,]
+hypothalamus_19_cpm_filtered<-hypothalamus_19_cpm_filtered[rownames(hypothalamus_19_cpm_filtered) %in% genes_expressed_hypothalamus_19,]
+
+hypothalamus_19_count_filtered<-count_data_hypothalamus_19[rownames(count_data_hypothalamus_19) %in% genes_expressed_hypothalamus_19,]
+
+hypothalamus_19_tpm_filtered<-hypothalamus_19_tpm_filtered[complete.cases(hypothalamus_19_tpm_filtered),]
+hypothalamus_19_count_filtered<-hypothalamus_19_count_filtered[complete.cases(hypothalamus_19_count_filtered),]
+
+```
+
+```{r}
+write_delim(hypothalamus_19_count_filtered,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_19_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(hypothalamus_19_count_filtered)
+norm_factors <- calcNormFactors(object = hypothalamus_19_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_hypothalamus_19 <- sweep(hypothalamus_19_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_hypothalamus_19<-asinh(CTF_normalized_hypothalamus_19)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_hypothalamus_19,
+            "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_hypothalamus_19.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+#-------------------
+
+
+```{r}
+pituitary_columns_6 <- grep("pituitary_6", colnames(count_data_b))
+count_data_pituitary_6 <- count_data_b[, pituitary_columns_6]
+```
+
+```{r}
+count_data_pituitary_6$geneID <- rownames(count_data_pituitary_6)
+```
+
+```{r}
+pituitary_6_count_data_annotated<-merge(count_data_pituitary_6,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pituitary_6 <- count_data_pituitary_6[, -ncol(count_data_pituitary_6)]
+
+pituitary_6_gene_length<-pituitary_6_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pituitary_6 / pituitary_6_gene_length
+pituitary_6_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_6_fpkm<-as.data.frame(edgeR::rpkm(count_data_pituitary_6, pituitary_6_gene_length))
+pituitary_6_cpm<-as.data.frame(edgeR::cpm(count_data_pituitary_6))
+pituitary_6_cpm_filtered<-pituitary_6_cpm[rowSums(pituitary_6_cpm>1) > 9,]
+pituitary_6_tpm_filtered<-pituitary_6_fpkm[rowSums(pituitary_6_tpm>1) > 9,]
+
+genes_expressed_pituitary_6<-intersect(rownames(pituitary_6_cpm_filtered), rownames(pituitary_6_tpm_filtered))
+
+pituitary_6_tpm_filtered<-pituitary_6_tpm_filtered[rownames(pituitary_6_tpm_filtered) %in% genes_expressed_pituitary_6,]
+pituitary_6_cpm_filtered<-pituitary_6_cpm_filtered[rownames(pituitary_6_cpm_filtered) %in% genes_expressed_pituitary_6,]
+
+pituitary_6_count_filtered<-count_data_pituitary_6[rownames(count_data_pituitary_6) %in% genes_expressed_pituitary_6,]
+
+pituitary_6_tpm_filtered<-pituitary_6_tpm_filtered[complete.cases(pituitary_6_tpm_filtered),]
+pituitary_6_count_filtered<-pituitary_6_count_filtered[complete.cases(pituitary_6_count_filtered),]
+
+```
+
+```{r}
+write_delim(pituitary_6_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pituitary_6_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pituitary_6_count_filtered)
+norm_factors <- calcNormFactors(object = pituitary_6_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_pituitary_6 <- sweep(pituitary_6_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pituitary_6<-asinh(CTF_normalized_pituitary_6)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_pituitary_6,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_6.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-write.table(asinh_transf_CTF_normalized_pituitary_9,
+            delim = "\t",
+            quote =  "none")
+```
+
+
+
+```{r}
+pituitary_columns_9<- grep("pituitary_9", colnames(count_data_b))
+count_data_pituitary_9<- count_data_b[, pituitary_columns_9]
+```
+
+```{r}
+count_data_pituitary_9$geneID <- rownames(count_data_pituitary_9)
+```
+
+```{r}
+pituitary_9_count_data_annotated<-merge(count_data_pituitary_9,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pituitary_9<- count_data_pituitary_9[, -ncol(count_data_pituitary_9)]
+
+pituitary_9_gene_length<-pituitary_9_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pituitary_9/ pituitary_9_gene_length
+pituitary_9_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_9_fpkm<-as.data.frame(edgeR::rpkm(count_data_pituitary_9, pituitary_9_gene_length))
+pituitary_9_cpm<-as.data.frame(edgeR::cpm(count_data_pituitary_9))
+pituitary_9_cpm_filtered<-pituitary_9_cpm[rowSums(pituitary_9_cpm>1) > 9,]
+pituitary_9_tpm_filtered<-pituitary_9_fpkm[rowSums(pituitary_9_tpm>1) > 9,]
+
+genes_expressed_pituitary_9<-intersect(rownames(pituitary_9_cpm_filtered), rownames(pituitary_9_tpm_filtered))
+
+pituitary_9_tpm_filtered<-pituitary_9_tpm_filtered[rownames(pituitary_9_tpm_filtered) %in% genes_expressed_pituitary_9,]
+pituitary_9_cpm_filtered<-pituitary_9_cpm_filtered[rownames(pituitary_9_cpm_filtered) %in% genes_expressed_pituitary_9,]
+
+pituitary_9_count_filtered<-count_data_pituitary_9[rownames(count_data_pituitary_9) %in% genes_expressed_pituitary_9,]
+
+pituitary_9_tpm_filtered<-pituitary_9_tpm_filtered[complete.cases(pituitary_9_tpm_filtered),]
+pituitary_9_count_filtered<-pituitary_9_count_filtered[complete.cases(pituitary_9_count_filtered),]
+
+```
+
+```{r}
+write_delim(pituitary_9_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pituitary_9_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pituitary_9_count_filtered)
+norm_factors <- calcNormFactors(object = pituitary_9_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_pituitary_9 <- sweep(pituitary_9_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pituitary_9<-asinh(CTF_normalized_pituitary_9)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_pituitary_9,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_9.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
-write.table(asinh_transf_CTF_normalized_pituitary_19,
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+pituitary_columns_19<- grep("pituitary_19", colnames(count_data_b))
+count_data_pituitary_19<- count_data_b[, pituitary_columns_19]
+```
+
+```{r}
+count_data_pituitary_19$geneID <- rownames(count_data_pituitary_19)
+```
+
+```{r}
+pituitary_19_count_data_annotated<-merge(count_data_pituitary_19,
+                                   annotation.ensembl.symbol,
+                                   by.x="geneID",
+                                   by.y="ensembl_gene_id",
+                                   all.x=FALSE, 
+                                   all.y=FALSE)
+count_data_pituitary_19<- count_data_pituitary_19[, -ncol(count_data_pituitary_19)]
+
+pituitary_19_gene_length<-pituitary_19_count_data_annotated$transcript_length
+```
+
+```{r}
+x <- count_data_pituitary_19/ pituitary_19_gene_length
+pituitary_19_tpm <- as.data.frame(t( t(x) * 1e6 / colSums(x) ))
+pituitary_19_fpkm<-as.data.frame(edgeR::rpkm(count_data_pituitary_19, pituitary_19_gene_length))
+pituitary_19_cpm<-as.data.frame(edgeR::cpm(count_data_pituitary_19))
+pituitary_19_cpm_filtered<-pituitary_19_cpm[rowSums(pituitary_19_cpm>1) > 9,]
+pituitary_19_tpm_filtered<-pituitary_19_fpkm[rowSums(pituitary_19_tpm>1) > 9,]
+
+genes_expressed_pituitary_19<-intersect(rownames(pituitary_19_cpm_filtered), rownames(pituitary_19_tpm_filtered))
+
+pituitary_19_tpm_filtered<-pituitary_19_tpm_filtered[rownames(pituitary_19_tpm_filtered) %in% genes_expressed_pituitary_19,]
+pituitary_19_cpm_filtered<-pituitary_19_cpm_filtered[rownames(pituitary_19_cpm_filtered) %in% genes_expressed_pituitary_19,]
+
+pituitary_19_count_filtered<-count_data_pituitary_19[rownames(count_data_pituitary_19) %in% genes_expressed_pituitary_19,]
+
+pituitary_19_tpm_filtered<-pituitary_19_tpm_filtered[complete.cases(pituitary_19_tpm_filtered),]
+pituitary_19_count_filtered<-pituitary_19_count_filtered[complete.cases(pituitary_19_count_filtered),]
+
+```
+
+```{r}
+write_delim(pituitary_19_count_filtered,
+            "/home/yassine/Downloads/between_tissue/pituitary_19_count_filtered.txt",
+            delim = "\t",
+            quote =  "none")
+```
+
+
+```{r}
+# CTF and asinh transform the filtered  read count data
+lib_size <- base::colSums(pituitary_19_count_filtered)
+norm_factors <- calcNormFactors(object = pituitary_19_count_filtered,
+                                lib.size = lib_size,
+                                method = "TMM")
+CTF_normalized_pituitary_19 <- sweep(pituitary_19_count_filtered,2,norm_factors,"/")
+asinh_transf_CTF_normalized_pituitary_19<-asinh(CTF_normalized_pituitary_19)
+```
+
+
+```{r}
+write_delim(asinh_transf_CTF_normalized_pituitary_19,
             "/home/yassine/Downloads/between_tissue/asinh_transf_CTF_normalized_pituitary_19.txt",
-            quote = TRUE,
-            sep = "\t",
-            row.names = TRUE,
-            col.names = TRUE)
+            delim = "\t",
+            quote =  "none")
 ```
