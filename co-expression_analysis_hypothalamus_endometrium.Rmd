@@ -84,6 +84,17 @@ asinh_transf_CTF_normalized_endometrium_19<-read.table (file =                  
                                        sep= "\t")
 ```
 
+```{r}
+rownames(asinh_transf_CTF_normalized_endometrium_6)<-endometrium_6_count_data_annotated$geneID
+rownames(asinh_transf_CTF_normalized_endometrium_9)<-endometrium_9_count_data_annotated$geneID
+rownames(asinh_transf_CTF_normalized_endometrium_19)<-endometrium_19_count_data_annotated$geneID
+
+rownames(asinh_transf_CTF_normalized_hypothalamus_6)<-hypothalamus_6_count_data_annotated$geneID
+rownames(asinh_transf_CTF_normalized_hypothalamus_9)<-hypothalamus_9_count_data_annotated$geneID
+rownames(asinh_transf_CTF_normalized_hypothalamus_19)<-hypothalamus_19_count_data_annotated$geneID
+```
+
+
 
 # Venn diagramd to see the overlapping genes between hypothalamus and the endometrium tissues for each time point 
 ```{r}
@@ -164,7 +175,7 @@ registerDoParallel(cl)
 ```{r}
 sample_a<-data.frame()
 random_a<-data.frame()
-random_b<-data.frame(matrix(NA, nrow = 291760561, ncol = 1))
+random_b<-data.frame(matrix(NA, nrow = 93216466, ncol = 1))
 for (i in (1:5)){
 randomization<-sample(1:10,replace=F)
 
@@ -202,7 +213,7 @@ axis.title.x = element_text(color="black", size=10)
 ```{r}
 sample_a<-data.frame()
 random_a<-data.frame()
-random_b<-data.frame(matrix(NA, nrow = 291760561, ncol = 1))
+random_b<-data.frame(matrix(NA, nrow = 138675000, ncol = 1))
 for (i in (1:5)){
 randomization<-sample(1:10,replace=F)
 
@@ -241,7 +252,7 @@ axis.title.x = element_text(color="black", size=10)
 ```{r}
 sample_a<-data.frame()
 random_a<-data.frame()
-random_b<-data.frame(matrix(NA, nrow = 291760561, ncol = 1))
+random_b<-data.frame(matrix(NA, nrow = 129726657, ncol = 1))
 for (i in (1:5)){
 randomization<-sample(1:11,replace=F)
 
@@ -276,6 +287,7 @@ axis.title.y=element_text(color="black", size=10,hjust=0),
 axis.title.x = element_text(color="black", size=10)
 )
 ```
+
 
 
 
@@ -493,11 +505,17 @@ theme(
 
 # Obtain gene connectivity.
 
+
+
 ```{r}
 hypothalamus_6_gene_connectivity<- cor_hypothalamus_endometrium_6_0.95_annotated %>%
   dplyr::count(hypothalamus_gene_symbol) %>% 
   dplyr::arrange(desc(n))
+```
 
+
+
+```{r}
 hypothalamus_6_gene_connectivity<-hypothalamus_6_gene_connectivity[hypothalamus_6_gene_connectivity$n > 4,]
 hypothalamus_6_gene_connectivity<-hypothalamus_6_gene_connectivity[!(hypothalamus_6_gene_connectivity$hypothalamus_gene_symbol ==""),]
 
@@ -523,6 +541,7 @@ geom_col( aes(x=hypothalamus_gene_symbol, y=n),
 ```{r}
 gene_connectivity_hypothalamus_6
 ```
+
 ```{r}
 hypothalamus_9_gene_connectivity<- cor_hypothalamus_endometrium_9_0.95_annotated %>%
   dplyr::count(hypothalamus_gene_symbol) %>% 
@@ -561,8 +580,12 @@ gene_connectivity_hypothalamus_9
 hypothalamus_19_gene_connectivity<- cor_hypothalamus_endometrium_19_0.95_annotated %>%
   dplyr::count(hypothalamus_gene_symbol) %>% 
   dplyr::arrange(desc(n))
+```
 
-hypothalamus_19_gene_connectivity<-hypothalamus_19_gene_connectivity[hypothalamus_19_gene_connectivity$n > 4,]
+
+
+```{r}
+hypothalamus_19_gene_connectivity<-hypothalamus_19_gene_connectivity[hypothalamus_19_gene_connectivity$n >=1,]
 hypothalamus_19_gene_connectivity<-hypothalamus_19_gene_connectivity[!(hypothalamus_19_gene_connectivity$hypothalamus_gene_symbol ==""),]
 
 hypothalamus_19_gene_connectivity$hypothalamus_gene_symbol<-factor(
@@ -655,8 +678,11 @@ gene_connectivity_endometrium_9
 endometrium_19_gene_connectivity<- cor_hypothalamus_endometrium_19_0.95_annotated %>%
   dplyr::count(endometrium_gene_symbol) %>% 
   dplyr::arrange(desc(n))
+```
 
-endometrium_19_gene_connectivity<-endometrium_19_gene_connectivity[endometrium_19_gene_connectivity$n > 4,]
+
+```{r}
+endometrium_19_gene_connectivity<-endometrium_19_gene_connectivity[endometrium_19_gene_connectivity$n >= 1,]
 endometrium_19_gene_connectivity<-endometrium_19_gene_connectivity[!(endometrium_19_gene_connectivity$endometrium_gene_symbol ==""),]
 
 endometrium_19_gene_connectivity$endometrium_gene_symbol<-factor(endometrium_19_gene_connectivity$endometrium_gene_symbol,
@@ -719,12 +745,18 @@ for (i in seq(dim(cor_hypothalamus_endometrium_6_0.95_filtered)[1]))
   cor_hypothalamus_endometrium_6_0.95_filtered$r.squared[i]<-summary(model_hypothalamus_endo)$adj.r.squared
   cor_hypothalamus_endometrium_6_0.95_filtered$rmse[i]<-sqrt(mean(model_hypothalamus_endo$residuals^2))
 }
+```
 
-cor_hypothalamus_endometrium_6_0.95_filtered<-cor_hypothalamus_endometrium_6_0.95_filtered[cor_hypothalamus_endometrium_6_0.95_filtered$angle > 40 & cor_hypothalamus_endometrium_6_0.95_filtered$angle < 60,]
 
+```{r}
+cor_hypothalamus_endometrium_6_0.95_filtered<-cor_hypothalamus_endometrium_6_0.95_filtered[cor_hypothalamus_endometrium_6_0.95_filtered$angle > 30 & cor_hypothalamus_endometrium_6_0.95_filtered$angle < 60,]
+```
+
+
+```{r}
 cor_hypothalamus_endometrium_6_0.95_filtered<-cor_hypothalamus_endometrium_6_0.95_filtered[order(cor_hypothalamus_endometrium_6_0.95_filtered$rmse , decreasing = FALSE),]
 
-cor_hypothalamus_endometrium_6_0.95_filtered<-cor_hypothalamus_endometrium_6_0.95_filtered[cor_hypothalamus_endometrium_6_0.95_filtered$r.squared>0.3,]
+cor_hypothalamus_endometrium_6_0.95_filtered<-cor_hypothalamus_endometrium_6_0.95_filtered[cor_hypothalamus_endometrium_6_0.95_filtered$r.squared>0.15,]
 ```
 
 ```{r}
@@ -735,7 +767,7 @@ cor_hypothalamus_endometrium_6_0.95_filtered
 ```{r}
 dataframegraph<-data.frame()
 
-for (i in c(1:8)){
+for (i in c(1:2)){
 
   gene_hypothalamus<-as.character(cor_hypothalamus_endometrium_6_0.95_filtered$gene_hypothalamus)[i]
   gene_endometrium<-as.character(cor_hypothalamus_endometrium_6_0.95_filtered$gene_endometrium)[i]
@@ -761,7 +793,7 @@ for (i in c(1:8)){
 
 }
 plots<-list()
-for (i in c(1:8)){
+for (i in c(1:2)){
   plots[[i]]<- ggplot(dataframegraph[dataframegraph$graph==i,],
                       aes(x=expression_hypothalamus,
                           y=expression_endometrium))+
@@ -827,7 +859,7 @@ for (i in seq(dim(cor_hypothalamus_endometrium_9_0.95_filtered)[1]))
   cor_hypothalamus_endometrium_9_0.95_filtered$rmse[i]<-sqrt(mean(model_hypothalamus_endo$residuals^2))
 }
 
-cor_hypothalamus_endometrium_9_0.95_filtered<-cor_hypothalamus_endometrium_9_0.95_filtered[cor_hypothalamus_endometrium_9_0.95_filtered$angle > 40 & cor_hypothalamus_endometrium_9_0.95_filtered$angle < 60,]
+cor_hypothalamus_endometrium_9_0.95_filtered<-cor_hypothalamus_endometrium_9_0.95_filtered[cor_hypothalamus_endometrium_9_0.95_filtered$angle > 30 & cor_hypothalamus_endometrium_9_0.95_filtered$angle < 60,]
 
 cor_hypothalamus_endometrium_9_0.95_filtered<-cor_hypothalamus_endometrium_9_0.95_filtered[order(cor_hypothalamus_endometrium_9_0.95_filtered$rmse , decreasing = FALSE),]
 
@@ -843,7 +875,7 @@ cor_hypothalamus_endometrium_9_0.95_filtered
 ```{r}
 dataframegraph<-data.frame()
 
-for (i in c(1:5)){
+for (i in c(1:4)){
 
   gene_hypothalamus<-as.character(cor_hypothalamus_endometrium_9_0.95_filtered$gene_hypothalamus)[i]
   gene_endometrium<-as.character(cor_hypothalamus_endometrium_9_0.95_filtered$gene_endometrium)[i]
@@ -869,7 +901,11 @@ for (i in c(1:5)){
 
 }
 plots<-list()
-for (i in c(1:5)){
+```
+
+
+```{r}
+for (i in c(1:4)){
   plots[[i]]<- ggplot(dataframegraph[dataframegraph$graph==i,],
                       aes(x=expression_hypothalamus,
                           y= expression_endometrium))+
@@ -893,7 +929,7 @@ y.grob <- textGrob("endometrium",
 
 
 ```{r}
-plot_regr_9<-plot_grid( grid.arrange(arrangeGrob(plot_grid(plotlist=plots, nrow=3),
+plot_regr_9<-plot_grid( grid.arrange(arrangeGrob(plot_grid(plotlist=plots, nrow=2),
                                                  left = y.grob,
                                                  bottom = x.grob)))
 ```
@@ -932,8 +968,11 @@ for (i in seq(dim(cor_hypothalamus_endometrium_19_0.95_filtered)[1]))
 }
 
 
-cor_hypothalamus_endometrium_19_0.95_filtered<-cor_hypothalamus_endometrium_19_0.95_filtered[cor_hypothalamus_endometrium_19_0.95_filtered$angle > 40 & cor_hypothalamus_endometrium_19_0.95_filtered$angle < 60,]
+cor_hypothalamus_endometrium_19_0.95_filtered<-cor_hypothalamus_endometrium_19_0.95_filtered[cor_hypothalamus_endometrium_19_0.95_filtered$angle > 20 & cor_hypothalamus_endometrium_19_0.95_filtered$angle < 60,]
+```
 
+
+```{r}
 cor_hypothalamus_endometrium_19_0.95_filtered<-cor_hypothalamus_endometrium_19_0.95_filtered[order(cor_hypothalamus_endometrium_19_0.95_filtered$rmse , decreasing = FALSE),]
 
 cor_hypothalamus_endometrium_19_0.95_filtered<-cor_hypothalamus_endometrium_19_0.95_filtered[cor_hypothalamus_endometrium_19_0.95_filtered$r.squared>0.3,]
@@ -947,7 +986,7 @@ cor_hypothalamus_endometrium_19_0.95_filtered
 ```{r}
 dataframegraph<-data.frame()
 
-for (i in c(1:9)){
+for (i in c(1:3)){
 
   gene_hypothalamus<-as.character(cor_hypothalamus_endometrium_19_0.95_filtered$gene_hypothalamus)[i]
   gene_endometrium<-as.character(cor_hypothalamus_endometrium_19_0.95_filtered$gene_endometrium)[i]
@@ -972,7 +1011,7 @@ for (i in c(1:9)){
 
 }
 plots<-list()
-for (i in c(1:9)){
+for (i in c(1:3)){
   plots[[i]]<- ggplot(dataframegraph[dataframegraph$graph==i,],
                       aes(x=expression_hypothalamus,
                           y= expression_endometrium))+
@@ -997,7 +1036,7 @@ y.grob <- textGrob("endometrium",
 
 
 ```{r}
-plot_regr_19<-plot_grid( grid.arrange(arrangeGrob(plot_grid(plotlist=plots, nrow=3),
+plot_regr_19<-plot_grid( grid.arrange(arrangeGrob(plot_grid(plotlist=plots, nrow=1),
                                                left = y.grob,
                                                bottom = x.grob)))
 ```
@@ -1572,9 +1611,8 @@ hypothalamus_endometrium_9_summary_plot<-cowplot::plot_grid(
   cowplot::plot_grid(cowplot::plot_grid(GO_endometrium_9_plot,GO_hypothalamus_9_plot, nrow =2, align = 'v',labels = c("E", "F"), label_fontface = "plain", label_size = 12), NULL, rel_widths=c(1,0.5)),
   nrow=2, rel_heights=c(1,0.6))
 ```
-
 ```{r}
-gene_connectivity_endometrium_9
+hypothalamus_endometrium_9_summary_plot
 ```
 
 ```{r}
@@ -1876,3 +1914,4 @@ ggsave(filename="/home/yassine/Downloads/between_tissue/Figures/hypothalamus_end
        width = 10, 
        height = 10)
 ```
+
