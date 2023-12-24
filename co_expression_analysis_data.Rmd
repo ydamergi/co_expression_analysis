@@ -1,43 +1,3 @@
-# Load libraries
-```{r}
-.libPaths("/usr/lib/R/site-library")
-library("edgeR", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("DESeq2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("DEsingle", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("biomaRt",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("goseq" ,quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("VennDiagram", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("ggpubr", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("Rtsne", quietly = TRUE,lib.loc="/usr/lib/R/site-library")
-library("MEGENA",quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("DGCA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library('dplyr', quietly = TRUE,lib.loc="/usr/lib/R/site-library")
-library("ggplot2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("ggrepel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("gridExtra",quietly = TRUE , lib.loc="/usr/lib/R/site-library")
-library("readr" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("ggfortify" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("cowplot" , quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("tidyverse", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("WGCNA", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("reshape2", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("foreach", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("doParallel", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("bigmemory", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("gtools", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("data.table", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("flashClust", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("dendextend", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library('vegan', quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("ade4", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("gridGraphics", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library("networkD3", quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library(readxl, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library(dplyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library(tidyr, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-library(plotly, quietly = TRUE, lib.loc="/usr/lib/R/site-library")
-
-```
 # Run the RNA Seq R script first to be able to Load the annotation 
 ```{r}
 annotation.ensembl.symbol <-read.table(file = "/home/yassine/Downloads/between_tissue/annotation.ensembl.symbol.txt",
@@ -112,10 +72,23 @@ pwbc_6_count_filtered<-count_data_pwbc_6[rownames(count_data_pwbc_6) %in% genes_
 
 pwbc_6_tpm_filtered<-pwbc_6_tpm_filtered[complete.cases(pwbc_6_tpm_filtered),]
 pwbc_6_count_filtered<-pwbc_6_count_filtered[complete.cases(pwbc_6_count_filtered),]
+pwbc_6_count_filtered$geneID<-rownames(pwbc_6_count_filtered)
 
+pwbc_6_count_data_annotated<-merge(pwbc_6_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+pwbc_6_count_filtered<-pwbc_6_count_filtered[, -ncol(pwbc_6_count_filtered)]
 ```
 
 ```{r}
+write_delim(pwbc_6_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pwbc_6_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pwbc_6_count_filtered,
             "/home/yassine/Downloads/between_tissue/pwbc_6_count_filtered.txt",
             delim = "\t",
@@ -140,7 +113,6 @@ write_delim(asinh_transf_CTF_normalized_pwbc_6,
             delim = "\t",
             quote =  "none")
 ```
-
 
 
 ```{r}
@@ -181,10 +153,23 @@ pwbc_9_count_filtered<-count_data_pwbc_9[rownames(count_data_pwbc_9) %in% genes_
 
 pwbc_9_tpm_filtered<-pwbc_9_tpm_filtered[complete.cases(pwbc_9_tpm_filtered),]
 pwbc_9_count_filtered<-pwbc_9_count_filtered[complete.cases(pwbc_9_count_filtered),]
+pwbc_9_count_filtered$geneID<-rownames(pwbc_9_count_filtered)
 
+pwbc_9_count_data_annotated<-merge(pwbc_9_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+pwbc_9_count_filtered<-pwbc_9_count_filtered[,-ncol(pwbc_9_count_filtered)]
 ```
 
 ```{r}
+write_delim(pwbc_9_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pwbc_9_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pwbc_9_count_filtered,
             "/home/yassine/Downloads/between_tissue/pwbc_9_count_filtered.txt",
             delim = "\t",
@@ -249,10 +234,23 @@ pwbc_19_count_filtered<-count_data_pwbc_19[rownames(count_data_pwbc_19) %in% gen
 
 pwbc_19_tpm_filtered<-pwbc_19_tpm_filtered[complete.cases(pwbc_19_tpm_filtered),]
 pwbc_19_count_filtered<-pwbc_19_count_filtered[complete.cases(pwbc_19_count_filtered),]
+pwbc_19_count_filtered$geneID<-rownames(pwbc_19_count_filtered)
 
+pwbc_19_count_data_annotated<-merge(pwbc_19_count_filtered,
+                                         annotation.ensembl.symbol,
+                                         by.x="geneID",
+                                         by.y="ensembl_gene_id",
+                                         all.x=FALSE, 
+                                         all.y=FALSE)
+pwbc_19_count_filtered<-pwbc_19_count_filtered[,-ncol(pwbc_19_count_filtered)]
 ```
 
 ```{r}
+write_delim(pwbc_19_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pwbc_19_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pwbc_19_count_filtered,
             "/home/yassine/Downloads/between_tissue/pwbc_19_count_filtered.txt",
             delim = "\t",
@@ -319,10 +317,23 @@ endometrium_6_count_filtered<-count_data_endometrium_6[rownames(count_data_endom
 
 endometrium_6_tpm_filtered<-endometrium_6_tpm_filtered[complete.cases(endometrium_6_tpm_filtered),]
 endometrium_6_count_filtered<-endometrium_6_count_filtered[complete.cases(endometrium_6_count_filtered),]
+endometrium_6_count_filtered$geneID<-rownames(endometrium_6_count_filtered)
 
+endometrium_6_count_data_annotated<-merge(endometrium_6_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+endometrium_6_count_filtered<-endometrium_6_count_filtered[, -ncol(endometrium_6_count_filtered)]
 ```
 
 ```{r}
+write_delim(endometrium_6_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/endometrium_6_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(endometrium_6_count_filtered,
             "/home/yassine/Downloads/between_tissue/endometrium_6_count_filtered.txt",
             delim = "\t",
@@ -347,7 +358,6 @@ write_delim(asinh_transf_CTF_normalized_endometrium_6,
             delim = "\t",
             quote =  "none")
 ```
-
 
 
 ```{r}
@@ -388,10 +398,23 @@ endometrium_9_count_filtered<-count_data_endometrium_9[rownames(count_data_endom
 
 endometrium_9_tpm_filtered<-endometrium_9_tpm_filtered[complete.cases(endometrium_9_tpm_filtered),]
 endometrium_9_count_filtered<-endometrium_9_count_filtered[complete.cases(endometrium_9_count_filtered),]
+endometrium_9_count_filtered$geneID<-rownames(endometrium_9_count_filtered)
 
+endometrium_9_count_data_annotated<-merge(endometrium_9_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+endometrium_9_count_filtered<-endometrium_9_count_filtered[,-ncol(endometrium_9_count_filtered)]
 ```
 
 ```{r}
+write_delim(endometrium_9_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/endometrium_9_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(endometrium_9_count_filtered,
             "/home/yassine/Downloads/between_tissue/endometrium_9_count_filtered.txt",
             delim = "\t",
@@ -456,10 +479,23 @@ endometrium_19_count_filtered<-count_data_endometrium_19[rownames(count_data_end
 
 endometrium_19_tpm_filtered<-endometrium_19_tpm_filtered[complete.cases(endometrium_19_tpm_filtered),]
 endometrium_19_count_filtered<-endometrium_19_count_filtered[complete.cases(endometrium_19_count_filtered),]
+endometrium_19_count_filtered$geneID<-rownames(endometrium_19_count_filtered)
 
+endometrium_19_count_data_annotated<-merge(endometrium_19_count_filtered,
+                                         annotation.ensembl.symbol,
+                                         by.x="geneID",
+                                         by.y="ensembl_gene_id",
+                                         all.x=FALSE, 
+                                         all.y=FALSE)
+endometrium_19_count_filtered<-endometrium_19_count_filtered[,-ncol(endometrium_19_count_filtered)]
 ```
 
 ```{r}
+write_delim(endometrium_19_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/endometrium_19_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(endometrium_19_count_filtered,
             "/home/yassine/Downloads/between_tissue/endometrium_19_count_filtered.txt",
             delim = "\t",
@@ -487,7 +523,6 @@ write_delim(asinh_transf_CTF_normalized_endometrium_19,
 
 
 #-----------------
-
 
 ```{r}
 hypothalamus_columns_6 <- grep("hypothalamus_6", colnames(count_data_b))
@@ -527,10 +562,23 @@ hypothalamus_6_count_filtered<-count_data_hypothalamus_6[rownames(count_data_hyp
 
 hypothalamus_6_tpm_filtered<-hypothalamus_6_tpm_filtered[complete.cases(hypothalamus_6_tpm_filtered),]
 hypothalamus_6_count_filtered<-hypothalamus_6_count_filtered[complete.cases(hypothalamus_6_count_filtered),]
+hypothalamus_6_count_filtered$geneID<-rownames(hypothalamus_6_count_filtered)
 
+hypothalamus_6_count_data_annotated<-merge(hypothalamus_6_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+hypothalamus_6_count_filtered<-hypothalamus_6_count_filtered[, -ncol(hypothalamus_6_count_filtered)]
 ```
 
 ```{r}
+write_delim(hypothalamus_6_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_6_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(hypothalamus_6_count_filtered,
             "/home/yassine/Downloads/between_tissue/hypothalamus_6_count_filtered.txt",
             delim = "\t",
@@ -555,7 +603,6 @@ write_delim(asinh_transf_CTF_normalized_hypothalamus_6,
             delim = "\t",
             quote =  "none")
 ```
-
 
 
 ```{r}
@@ -596,10 +643,23 @@ hypothalamus_9_count_filtered<-count_data_hypothalamus_9[rownames(count_data_hyp
 
 hypothalamus_9_tpm_filtered<-hypothalamus_9_tpm_filtered[complete.cases(hypothalamus_9_tpm_filtered),]
 hypothalamus_9_count_filtered<-hypothalamus_9_count_filtered[complete.cases(hypothalamus_9_count_filtered),]
+hypothalamus_9_count_filtered$geneID<-rownames(hypothalamus_9_count_filtered)
 
+hypothalamus_9_count_data_annotated<-merge(hypothalamus_9_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+hypothalamus_9_count_filtered<-hypothalamus_9_count_filtered[,-ncol(hypothalamus_9_count_filtered)]
 ```
 
 ```{r}
+write_delim(hypothalamus_9_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_9_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(hypothalamus_9_count_filtered,
             "/home/yassine/Downloads/between_tissue/hypothalamus_9_count_filtered.txt",
             delim = "\t",
@@ -664,10 +724,23 @@ hypothalamus_19_count_filtered<-count_data_hypothalamus_19[rownames(count_data_h
 
 hypothalamus_19_tpm_filtered<-hypothalamus_19_tpm_filtered[complete.cases(hypothalamus_19_tpm_filtered),]
 hypothalamus_19_count_filtered<-hypothalamus_19_count_filtered[complete.cases(hypothalamus_19_count_filtered),]
+hypothalamus_19_count_filtered$geneID<-rownames(hypothalamus_19_count_filtered)
 
+hypothalamus_19_count_data_annotated<-merge(hypothalamus_19_count_filtered,
+                                         annotation.ensembl.symbol,
+                                         by.x="geneID",
+                                         by.y="ensembl_gene_id",
+                                         all.x=FALSE, 
+                                         all.y=FALSE)
+hypothalamus_19_count_filtered<-hypothalamus_19_count_filtered[,-ncol(hypothalamus_19_count_filtered)]
 ```
 
 ```{r}
+write_delim(hypothalamus_19_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/hypothalamus_19_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(hypothalamus_19_count_filtered,
             "/home/yassine/Downloads/between_tissue/hypothalamus_19_count_filtered.txt",
             delim = "\t",
@@ -734,10 +807,23 @@ pituitary_6_count_filtered<-count_data_pituitary_6[rownames(count_data_pituitary
 
 pituitary_6_tpm_filtered<-pituitary_6_tpm_filtered[complete.cases(pituitary_6_tpm_filtered),]
 pituitary_6_count_filtered<-pituitary_6_count_filtered[complete.cases(pituitary_6_count_filtered),]
+pituitary_6_count_filtered$geneID<-rownames(pituitary_6_count_filtered)
 
+pituitary_6_count_data_annotated<-merge(pituitary_6_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+pituitary_6_count_filtered<-pituitary_6_count_filtered[, -ncol(pituitary_6_count_filtered)]
 ```
 
 ```{r}
+write_delim(pituitary_6_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pituitary_6_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pituitary_6_count_filtered,
             "/home/yassine/Downloads/between_tissue/pituitary_6_count_filtered.txt",
             delim = "\t",
@@ -762,7 +848,6 @@ write_delim(asinh_transf_CTF_normalized_pituitary_6,
             delim = "\t",
             quote =  "none")
 ```
-
 
 
 ```{r}
@@ -803,10 +888,23 @@ pituitary_9_count_filtered<-count_data_pituitary_9[rownames(count_data_pituitary
 
 pituitary_9_tpm_filtered<-pituitary_9_tpm_filtered[complete.cases(pituitary_9_tpm_filtered),]
 pituitary_9_count_filtered<-pituitary_9_count_filtered[complete.cases(pituitary_9_count_filtered),]
+pituitary_9_count_filtered$geneID<-rownames(pituitary_9_count_filtered)
 
+pituitary_9_count_data_annotated<-merge(pituitary_9_count_filtered,
+                                        annotation.ensembl.symbol,
+                                        by.x="geneID",
+                                        by.y="ensembl_gene_id",
+                                        all.x=FALSE, 
+                                        all.y=FALSE)
+pituitary_9_count_filtered<-pituitary_9_count_filtered[,-ncol(pituitary_9_count_filtered)]
 ```
 
 ```{r}
+write_delim(pituitary_9_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pituitary_9_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pituitary_9_count_filtered,
             "/home/yassine/Downloads/between_tissue/pituitary_9_count_filtered.txt",
             delim = "\t",
@@ -871,10 +969,23 @@ pituitary_19_count_filtered<-count_data_pituitary_19[rownames(count_data_pituita
 
 pituitary_19_tpm_filtered<-pituitary_19_tpm_filtered[complete.cases(pituitary_19_tpm_filtered),]
 pituitary_19_count_filtered<-pituitary_19_count_filtered[complete.cases(pituitary_19_count_filtered),]
+pituitary_19_count_filtered$geneID<-rownames(pituitary_19_count_filtered)
 
+pituitary_19_count_data_annotated<-merge(pituitary_19_count_filtered,
+                                         annotation.ensembl.symbol,
+                                         by.x="geneID",
+                                         by.y="ensembl_gene_id",
+                                         all.x=FALSE, 
+                                         all.y=FALSE)
+pituitary_19_count_filtered<-pituitary_19_count_filtered[,-ncol(pituitary_19_count_filtered)]
 ```
 
 ```{r}
+write_delim(pituitary_19_count_data_annotated,
+            "/home/yassine/Downloads/between_tissue/pituitary_19_count_annotated.txt",
+            delim = "\t",
+            quote =  "none")
+
 write_delim(pituitary_19_count_filtered,
             "/home/yassine/Downloads/between_tissue/pituitary_19_count_filtered.txt",
             delim = "\t",
